@@ -41,9 +41,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  // Protect client appointments route
+  if (pathname.startsWith("/appointments") && !user) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/book/:path*"],
+  matcher: ["/admin/:path*", "/book/:path*", "/appointments/:path*"],
 };
