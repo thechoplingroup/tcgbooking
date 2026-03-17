@@ -130,7 +130,7 @@ export async function POST(request: Request) {
         clientEmail: user.email,
         clientName: clientData?.full_name ?? null,
         stylistName: stylistData.name,
-        stylistEmail: user.email, // fallback: notify client only if stylist email unavailable
+        stylistEmail: process.env.STYLIST_NOTIFICATION_EMAIL ?? "kerichoplin@gmail.com",
         serviceName: (service as { id: string; name: string; is_active: boolean }).name,
         startAt: appointment.start_at,
         endAt: appointment.end_at,
