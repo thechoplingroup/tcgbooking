@@ -16,9 +16,6 @@ export default function HomePage() {
 
         <h1 className="font-display text-5xl sm:text-6xl md:text-7xl text-[#1a1714] mb-4 leading-tight">
           Keri Choplin
-          <span className="block text-[#9b6f6f] italic text-4xl sm:text-5xl md:text-6xl mt-1">
-            Hair Studio
-          </span>
         </h1>
 
         <p className="text-[#8a7e78] text-lg sm:text-xl max-w-md mx-auto mt-4 mb-10 leading-relaxed font-light">
@@ -32,12 +29,7 @@ export default function HomePage() {
           >
             Book an Appointment
           </Link>
-          <Link
-            href="/admin"
-            className="inline-flex items-center justify-center px-8 py-3.5 border border-[#e8e2dc] text-[#5c4a42] font-medium rounded-full hover:bg-[#f5ede8] transition-all active:scale-[0.98] text-sm tracking-wide bg-white min-h-[48px]"
-          >
-            Studio Dashboard
-          </Link>
+
         </div>
 
         {/* Hours teaser */}
