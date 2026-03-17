@@ -15,7 +15,7 @@ async function handleRateLimit(request: NextRequest): Promise<NextResponse | nul
   if (!pathname.startsWith("/api/")) return null;
 
   try {
-    const { bookingRateLimit, apiRateLimit, checkRateLimit } = await import("@/lib/ratelimit");
+    const { bookingRateLimit, checkRateLimit } = await import("@/lib/ratelimit");
     const ip = getIP(request);
 
     // Only rate limit the booking submission endpoint
