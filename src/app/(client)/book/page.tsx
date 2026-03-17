@@ -6,7 +6,6 @@ export default async function BookPage() {
   const { data: stylists } = await supabase
     .from("stylists")
     .select("id")
-    .eq("is_active", true)
     .limit(1);
 
   const stylistId = stylists?.[0]?.id;
