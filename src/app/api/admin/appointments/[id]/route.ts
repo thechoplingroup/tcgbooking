@@ -49,6 +49,7 @@ export async function PATCH(
     .single();
 
   if (error) {
+    console.error("[api/admin/appointments/[id] PATCH]", { error: error.message, userId: user.id, appointmentId: params.id, status });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

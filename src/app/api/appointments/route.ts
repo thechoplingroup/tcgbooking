@@ -1,8 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { sendBookingConfirmation } from "@/lib/email";
+import { z } from "zod";
 
 const RATE_LIMIT_MAX = 3; // max bookings per day per client
+
+// ─── Zod validation ──────────────────────────────────────────────────────────
+
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const PostAppointmentSchema = z.object({
+  stylist_id: z.string().regex(uuidRegex, "stylist_id must be a valid UUID"),
+  service_id: z.string().regex(uuidRegex, "service_id must be a valid UUID"),
+  start_at: z.string().datetime({ message: "start_at must be a valid ISO date" }),
+  end_at: z.string().datetime({ message: "end_at must be a valid ISO date" }),
+  client_notes: z.string().max(500, "client_notes max 500 characters").optional(),
+});
 
 export async function GET() {
   const supabase = await createClient();
@@ -28,6 +41,7 @@ export async function GET() {
     .order("start_at");
 
   if (error) {
+    console.error("[api/appointments GET]", { error: error.message, userId: user.id });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -45,21 +59,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { stylist_id, service_id, start_at, end_at, client_notes } = body as {
-    stylist_id: string;
-    service_id: string;
-    start_at: string;
-    end_at: string;
-    client_notes?: string;
-  };
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
-  if (!stylist_id || !service_id || !start_at || !end_at) {
+  const parsed = PostAppointmentSchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "stylist_id, service_id, start_at, end_at are required" },
+      { error: "validation failed", details: parsed.error.issues.map((e) => ({ path: e.path.join("."), message: e.message })) },
       { status: 400 }
     );
   }
+
+  const { stylist_id, service_id, start_at, end_at, client_notes } = parsed.data;
 
   // Rate limit: max 3 bookings per day per client
   const todayStart = new Date();
@@ -124,6 +139,7 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    console.error("[api/appointments POST]", { error: error.message, userId: user.id, stylist_id, service_id });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

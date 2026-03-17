@@ -9,10 +9,12 @@ export async function GET(request: Request) {
 
   const { data: stylist } = await supabase
     .from("stylists").select("id").eq("user_id", user.id).single();
-  if (!stylist) return NextResponse.json({ clients: [] });
+  if (!stylist) return NextResponse.json({ clients: [], total: 0, hasMore: false });
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("q")?.toLowerCase() ?? "";
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
 
   // Use service role to read auth user emails
   const serviceClient = createServiceClient(
@@ -28,7 +30,10 @@ export async function GET(request: Request) {
     .eq("stylist_id", stylist.id)
     .not("client_id", "is", null);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[api/admin/clients GET]", { error: error.message, userId: user.id });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   // Aggregate per client
   const clientMap = new Map<string, {
@@ -53,7 +58,7 @@ export async function GET(request: Request) {
     }
   }
 
-  if (clientMap.size === 0) return NextResponse.json({ clients: [] });
+  if (clientMap.size === 0) return NextResponse.json({ clients: [], total: 0, hasMore: false });
 
   const clientIds = Array.from(clientMap.keys());
 
@@ -72,7 +77,8 @@ export async function GET(request: Request) {
     }
   } catch { /* emails optional */ }
 
-  const clients = (profiles ?? [])
+  // Build + filter full list
+  let clients = (profiles ?? [])
     .map((p) => {
       const stats = clientMap.get(p.id)!;
       return {
@@ -93,5 +99,10 @@ export async function GET(request: Request) {
     })
     .sort((a, b) => b.lastAppointment.localeCompare(a.lastAppointment));
 
-  return NextResponse.json({ clients });
+  const total = clients.length;
+  const offset = (page - 1) * limit;
+  clients = clients.slice(offset, offset + limit);
+  const hasMore = offset + clients.length < total;
+
+  return NextResponse.json({ clients, total, hasMore, page, limit });
 }

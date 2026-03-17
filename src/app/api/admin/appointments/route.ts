@@ -50,6 +50,7 @@ export async function GET(request: Request) {
   const { data, error } = await query;
 
   if (error) {
+    console.error("[api/admin/appointments GET]", { error: error.message, userId: user.id, status });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

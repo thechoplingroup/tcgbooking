@@ -1,4 +1,6 @@
 import ClientNav from "@/components/ClientNav";
+import ClientAuthGuard from "@/components/ClientAuthGuard";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 export default async function ClientLayout({
   children,
@@ -7,8 +9,11 @@ export default async function ClientLayout({
 }) {
   return (
     <div className="min-h-screen bg-[#faf8f5]">
+      <ClientAuthGuard />
       <ClientNav />
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10">{children}</main>
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-[#e8e2dc] bg-white mt-16">

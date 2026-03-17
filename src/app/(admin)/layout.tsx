@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import AdminSignOutButton from "@/components/AdminSignOutButton";
 import AdminBottomNav from "@/components/AdminBottomNav";
 import { ToastProvider } from "@/components/Toast";
+import ClientAuthGuard from "@/components/ClientAuthGuard";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const NAV_MAIN = [
   {
@@ -116,6 +118,7 @@ export default async function AdminLayout({
 
   return (
     <ToastProvider>
+    <ClientAuthGuard />
     <div className="min-h-screen bg-[#faf8f5]">
       {/* Mobile top bar */}
       <div className="lg:hidden flex items-center justify-between px-4 py-3.5 bg-white border-b border-[#e8e2dc] sticky top-0 z-40">
@@ -214,7 +217,7 @@ export default async function AdminLayout({
 
         {/* Main content — with bottom padding for mobile nav */}
         <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-auto pb-24 lg:pb-8">
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>
 

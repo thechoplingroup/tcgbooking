@@ -5,6 +5,7 @@ import type { OperationalHour, OperationalHoursOverride } from "@/lib/supabase/t
 import { useToast } from "@/components/Toast";
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -142,41 +143,29 @@ function DayRow({ dayIndex, hour, onSaved, onClosed }: DayRowProps) {
   );
 }
 
-// ─── Day Sheet (bottom sheet for calendar day) ──────────────────────────────
+// ─── Inline Day Editor (replaces DaySheet) ──────────────────────────────────
 
-interface DaySheetProps {
+interface InlineDayEditorProps {
   dateKey: string; // YYYY-MM-DD
-  defaultHour: OperationalHour | undefined; // weekly default for that day
+  defaultHour: OperationalHour | undefined;
   override: OperationalHoursOverride | undefined;
   onSaved: (o: OperationalHoursOverride) => void;
   onDeleted: (dateKey: string) => void;
   onClose: () => void;
+  savedFlash: boolean;
 }
 
-const HALF_HOURS: string[] = [];
-for (let h = 7; h <= 20; h++) {
-  HALF_HOURS.push(`${String(h).padStart(2, "0")}:00`);
-  if (h < 20) HALF_HOURS.push(`${String(h).padStart(2, "0")}:30`);
-}
-
-function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose }: DaySheetProps) {
+function InlineDayEditor({
+  dateKey,
+  defaultHour,
+  override,
+  onSaved,
+  onDeleted,
+  onClose,
+  savedFlash,
+}: InlineDayEditorProps) {
   const { toast } = useToast();
 
-  // Prevent background scroll when sheet is open
-  useEffect(() => {
-    const scrollY = window.scrollY;
-    document.body.style.overflow = "hidden";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.position = "fixed";
-    document.body.style.width = "100%";
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.width = "";
-      window.scrollTo(0, scrollY);
-    };
-  }, []);
   const initOpen = override ? !override.is_closed : !!defaultHour;
   const initOpenTime = override?.open_time?.slice(0, 5) ?? defaultHour?.open_time?.slice(0, 5) ?? "09:00";
   const initCloseTime = override?.close_time?.slice(0, 5) ?? defaultHour?.close_time?.slice(0, 5) ?? "17:00";
@@ -184,41 +173,13 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
   const [isOpen, setIsOpen] = useState(initOpen);
   const [openAt, setOpenAt] = useState(initOpenTime);
   const [closeAt, setCloseAt] = useState(initCloseTime);
-  const [note, setNote] = useState(override?.label ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Which 30-min blocks are "selected" (between openAt and closeAt)
-  function getSelectedBlocks(open: string, close: string): Set<string> {
-    const s = new Set<string>();
-    let inRange = false;
-    for (const slot of HALF_HOURS) {
-      if (slot === open) inRange = true;
-      if (inRange && slot < close) s.add(slot);
-      if (slot === close) break;
-    }
-    return s;
-  }
-
-  const [selectedBlocks, setSelectedBlocks] = useState(() => getSelectedBlocks(openAt, closeAt));
-
-  function applyBlockSelection(blocks: Set<string>) {
-    const sorted = HALF_HOURS.filter((h) => blocks.has(h));
-    if (sorted.length === 0) return;
-    const newOpen = sorted[0]!;
-    const lastBlock = sorted[sorted.length - 1]!;
-    const lastIdx = HALF_HOURS.indexOf(lastBlock);
-    const newClose = lastIdx < HALF_HOURS.length - 1 ? HALF_HOURS[lastIdx + 1]! : lastBlock;
-    setOpenAt(newOpen);
-    setCloseAt(newClose);
-  }
-
-  function toggleBlock(slot: string) {
-    const next = new Set(selectedBlocks);
-    if (next.has(slot)) next.delete(slot); else next.add(slot);
-    setSelectedBlocks(next);
-    applyBlockSelection(next);
-  }
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dateObj = new Date(y!, m! - 1, d!);
+  const dayName = DAY_LONG[dateObj.getDay()];
+  const displayDate = dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   async function handleSave() {
     setSaving(true);
@@ -227,7 +188,7 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          label: note.trim() || null,
+          label: null,
           effective_from: dateKey,
           effective_until: dateKey,
           day_of_week: null,
@@ -241,7 +202,6 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
         toast(data.error ?? "Failed to save", "error");
       } else {
         onSaved(data.override);
-        toast("Saved ✓", "success");
         onClose();
       }
     } catch {
@@ -270,148 +230,101 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
     }
   }
 
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const displayDate = new Date(y!, m! - 1, d!).toLocaleDateString("en-US", {
-    weekday: "long", month: "long", day: "numeric",
-  });
-
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl max-h-[90vh] flex flex-col">
-        <div className="sticky top-0 bg-white pt-4 px-5 pb-3 border-b border-[#f5f0eb] z-10">
-          <div className="w-10 h-1 bg-[#e8e2dc] rounded-full mx-auto mb-3" />
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-display text-base text-[#1a1714]">{displayDate}</p>
-              {override && (
-                <span className="text-xs text-[#c9a96e] font-medium">Has override</span>
-              )}
-            </div>
-            <button onClick={onClose} className="p-1.5 text-[#8a7e78] hover:text-[#1a1714]">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div className="p-5 space-y-5 overflow-y-auto flex-1 pb-2" style={{ WebkitOverflowScrolling: 'touch' } as never}>
-          {/* Open / Closed toggle */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setIsOpen(true)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                isOpen ? "bg-[#9b6f6f] text-white border-[#9b6f6f]" : "bg-white text-[#8a7e78] border-[#e8e2dc] hover:bg-[#f5f0eb]"
-              }`}
-            >
-              Open
-            </button>
-            <button
-              onClick={() => setIsOpen(false)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                !isOpen ? "bg-[#1a1714] text-white border-[#1a1714]" : "bg-white text-[#8a7e78] border-[#e8e2dc] hover:bg-[#f5f0eb]"
-              }`}
-            >
-              Closed
-            </button>
-          </div>
-
-          {isOpen && (
-            <>
-              {/* Quick time inputs */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-[#5c4a42] mb-1.5">Open at</label>
-                  <input
-                    type="time"
-                    value={openAt}
-                    onChange={(e) => {
-                      setOpenAt(e.target.value);
-                      setSelectedBlocks(getSelectedBlocks(e.target.value, closeAt));
-                    }}
-                    className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
-                    style={{ fontSize: 16 }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#5c4a42] mb-1.5">Close at</label>
-                  <input
-                    type="time"
-                    value={closeAt}
-                    onChange={(e) => {
-                      setCloseAt(e.target.value);
-                      setSelectedBlocks(getSelectedBlocks(openAt, e.target.value));
-                    }}
-                    className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
-                    style={{ fontSize: 16 }}
-                  />
-                </div>
-              </div>
-
-              {/* 30-min block picker */}
-              <div>
-                <p className="text-xs font-medium text-[#5c4a42] mb-2">Available time blocks (tap to toggle)</p>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {HALF_HOURS.map((slot) => {
-                    const selected = selectedBlocks.has(slot);
-                    return (
-                      <button
-                        key={slot}
-                        onClick={() => toggleBlock(slot)}
-                        className={`py-2 rounded-lg text-xs font-medium transition-colors border ${
-                          selected
-                            ? "bg-[#9b6f6f] text-white border-[#9b6f6f]"
-                            : "bg-white text-[#8a7e78] border-[#e8e2dc] hover:bg-[#f5ede8]"
-                        }`}
-                      >
-                        {formatTime12(slot)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
+    <div className="mt-3 bg-white rounded-2xl border-2 border-rose-200 shadow-lg p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="font-display text-base text-[#1a1714] font-semibold">{dayName}</p>
+          <p className="text-xs text-[#8a7e78]">{displayDate}</p>
+          {override && (
+            <span className="text-xs text-[#c9a96e] font-medium">Has override</span>
           )}
+        </div>
+        <div className="flex items-center gap-2">
+          {savedFlash && (
+            <span className="text-xs text-emerald-600 font-semibold">Saved ✓</span>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1.5 text-[#8a7e78] hover:text-[#1a1714] rounded-full hover:bg-[#f5f0eb] transition-colors"
+            aria-label="Close editor"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
-          {/* Note */}
+      {/* Open / Closed toggle */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setIsOpen(true)}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            isOpen ? "bg-[#9b6f6f] text-white border-[#9b6f6f]" : "bg-white text-[#8a7e78] border-[#e8e2dc] hover:bg-[#f5f0eb]"
+          }`}
+        >
+          Open
+        </button>
+        <button
+          onClick={() => setIsOpen(false)}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            !isOpen ? "bg-[#1a1714] text-white border-[#1a1714]" : "bg-white text-[#8a7e78] border-[#e8e2dc] hover:bg-[#f5f0eb]"
+          }`}
+        >
+          Closed
+        </button>
+      </div>
+
+      {/* Time inputs — only when Open */}
+      {isOpen && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
-            <label className="block text-xs font-medium text-[#5c4a42] mb-1.5">
-              Note <span className="font-normal text-[#8a7e78]">(optional)</span>
-            </label>
+            <label className="block text-xs font-medium text-[#5c4a42] mb-1.5">Opens</label>
             <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Dentist appt, vacation, etc."
-              className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
+              type="time"
+              value={openAt}
+              onChange={(e) => setOpenAt(e.target.value)}
+              className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
               style={{ fontSize: 16 }}
             />
           </div>
-
+          <div>
+            <label className="block text-xs font-medium text-[#5c4a42] mb-1.5">Closes</label>
+            <input
+              type="time"
+              value={closeAt}
+              onChange={(e) => setCloseAt(e.target.value)}
+              className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
+              style={{ fontSize: 16 }}
+            />
+          </div>
         </div>
+      )}
 
-        {/* Sticky action buttons — always visible above bottom nav */}
-        <div className="px-5 pt-3 border-t border-[#f5f0eb] bg-white flex gap-2" style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}>
+      {/* Save button */}
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold rounded-full disabled:opacity-50 transition-all"
+      >
+        {saving ? "Saving…" : "Save"}
+      </button>
+
+      {/* Clear override link */}
+      {override && (
+        <div className="text-center mt-2">
           <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 py-3 bg-[#9b6f6f] text-white text-sm font-semibold rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-all"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-xs text-[#8a7e78] hover:text-red-500 underline transition-colors disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Save"}
+            {deleting ? "Clearing…" : "Clear override"}
           </button>
-          {override && (
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="px-4 py-3 border border-red-200 text-red-600 text-sm font-medium rounded-full hover:bg-red-50 disabled:opacity-50 transition-colors"
-            >
-              {deleting ? "…" : "Clear"}
-            </button>
-          )}
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
 }
 
@@ -422,10 +335,19 @@ interface MonthCalendarProps {
   month: number; // 0-indexed
   hours: OperationalHour[];
   overrides: OperationalHoursOverride[];
+  selectedDay: string | null;
+  savedFlashDay: string | null;
   onDayClick: (dateKey: string) => void;
+  onEditorSaved: (o: OperationalHoursOverride) => void;
+  onEditorDeleted: (dateKey: string) => void;
+  onEditorClose: () => void;
 }
 
-function MonthCalendar({ year, month, hours, overrides, onDayClick }: MonthCalendarProps) {
+function MonthCalendar({
+  year, month, hours, overrides,
+  selectedDay, savedFlashDay,
+  onDayClick, onEditorSaved, onEditorDeleted, onEditorClose,
+}: MonthCalendarProps) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -437,18 +359,30 @@ function MonthCalendar({ year, month, hours, overrides, onDayClick }: MonthCalen
     }
   }
 
-  // Build calendar grid
   const firstDay = new Date(year, month, 1);
-  const startPad = firstDay.getDay(); // 0=Sun
+  const startPad = firstDay.getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const cells: (Date | null)[] = [
     ...Array(startPad).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
   ];
-
-  // Pad to complete rows
   while (cells.length % 7 !== 0) cells.push(null);
+
+  // Group into weeks (rows) so we can inject editor after the right row
+  const weeks: (Date | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7));
+  }
+
+  // Find which week (row index) the selected day is in
+  const selectedWeekIdx = selectedDay
+    ? weeks.findIndex((week) => week.some((d) => d && toDateKey(d) === selectedDay))
+    : -1;
+
+  const selectedOverride = selectedDay ? overrideMap.get(selectedDay) : undefined;
+  const selectedDayOfWeek = selectedDay ? new Date(selectedDay + "T12:00:00").getDay() : undefined;
+  const selectedDefaultHour = selectedDayOfWeek !== undefined ? hourMap[selectedDayOfWeek] : undefined;
 
   return (
     <div>
@@ -461,71 +395,99 @@ function MonthCalendar({ year, month, hours, overrides, onDayClick }: MonthCalen
         ))}
       </div>
 
-      {/* Cells */}
-      <div className="grid grid-cols-7 gap-px bg-[#f5f0eb] rounded-xl overflow-hidden border border-[#e8e2dc]">
-        {cells.map((date, idx) => {
-          if (!date) {
-            return <div key={`pad-${idx}`} className="bg-[#faf9f7] h-16 sm:h-20" />;
-          }
+      {/* Weeks + inline editor */}
+      <div className="space-y-px">
+        {weeks.map((week, weekIdx) => (
+          <div key={weekIdx}>
+            {/* Week row */}
+            <div className={`grid grid-cols-7 gap-px ${weekIdx === 0 ? "rounded-t-xl overflow-hidden" : ""} ${weekIdx === weeks.length - 1 && selectedWeekIdx !== weekIdx ? "rounded-b-xl overflow-hidden" : ""} bg-[#f5f0eb] border-x border-[#e8e2dc] ${weekIdx === 0 ? "border-t" : ""} ${weekIdx === weeks.length - 1 && selectedWeekIdx !== weekIdx ? "border-b" : ""}`}>
+              {week.map((date, dayIdx) => {
+                if (!date) {
+                  return <div key={`pad-${weekIdx}-${dayIdx}`} className="bg-[#faf9f7] h-16 sm:h-20" />;
+                }
 
-          const dateKey = toDateKey(date);
-          const isPast = date < today;
-          const isToday = date.getTime() === today.getTime();
-          const override = overrideMap.get(dateKey);
-          const defaultHour = hourMap[date.getDay()];
-          const hasOverride = !!override;
+                const dateKey = toDateKey(date);
+                const isPast = date < today;
+                const isToday = date.getTime() === today.getTime();
+                const override = overrideMap.get(dateKey);
+                const defaultHour = hourMap[date.getDay()];
+                const hasOverride = !!override;
+                const isSelected = selectedDay === dateKey;
+                const hasSavedFlash = savedFlashDay === dateKey;
 
-          let label = "";
-          let labelClass = "";
+                let label = "";
+                let labelClass = "";
 
-          if (override) {
-            if (override.is_closed) {
-              label = "Closed";
-              labelClass = "text-red-500";
-            } else {
-              const ot = override.open_time?.slice(0, 5) ?? "";
-              const ct = override.close_time?.slice(0, 5) ?? "";
-              label = ot && ct ? `${formatTime12(ot).replace(":00", "")} – ${formatTime12(ct).replace(":00", "")}` : "Open";
-              labelClass = "text-[#9b6f6f]";
-            }
-          } else if (defaultHour) {
-            const ot = defaultHour.open_time?.slice(0, 5) ?? "";
-            const ct = defaultHour.close_time?.slice(0, 5) ?? "";
-            label = ot && ct ? `${formatTime12(ot).replace(":00", "")}–${formatTime12(ct).replace(":00", "")}` : "Open";
-            labelClass = "text-[#8a7e78]";
-          } else {
-            label = "Closed";
-            labelClass = "text-[#c9b5ad]";
-          }
+                if (override) {
+                  if (override.is_closed) {
+                    label = "Closed";
+                    labelClass = "text-red-500";
+                  } else {
+                    const ot = override.open_time?.slice(0, 5) ?? "";
+                    const ct = override.close_time?.slice(0, 5) ?? "";
+                    label = ot && ct ? `${formatTime12(ot).replace(":00", "")} – ${formatTime12(ct).replace(":00", "")}` : "Open";
+                    labelClass = "text-[#9b6f6f]";
+                  }
+                } else if (defaultHour) {
+                  const ot = defaultHour.open_time?.slice(0, 5) ?? "";
+                  const ct = defaultHour.close_time?.slice(0, 5) ?? "";
+                  label = ot && ct ? `${formatTime12(ot).replace(":00", "")}–${formatTime12(ct).replace(":00", "")}` : "Open";
+                  labelClass = "text-[#8a7e78]";
+                } else {
+                  label = "Closed";
+                  labelClass = "text-[#c9b5ad]";
+                }
 
-          return (
-            <button
-              key={dateKey}
-              onClick={() => !isPast && onDayClick(dateKey)}
-              disabled={isPast}
-              className={`relative bg-white h-16 sm:h-20 p-1.5 sm:p-2 flex flex-col items-center transition-colors ${
-                isPast ? "opacity-40 cursor-default" : "hover:bg-[#faf3f0] cursor-pointer"
-              }`}
-            >
-              {/* Day number */}
-              <span className={`text-xs font-semibold mb-0.5 w-6 h-6 flex items-center justify-center rounded-full ${
-                isToday ? "bg-[#9b6f6f] text-white" : "text-[#1a1714]"
-              }`}>
-                {date.getDate()}
-              </span>
+                return (
+                  <button
+                    key={dateKey}
+                    onClick={() => !isPast && onDayClick(dateKey)}
+                    disabled={isPast}
+                    className={`relative bg-white h-16 sm:h-20 p-1.5 sm:p-2 flex flex-col items-center transition-colors ${
+                      isPast ? "opacity-40 cursor-default" : "hover:bg-[#faf3f0] cursor-pointer"
+                    } ${isSelected ? "bg-rose-50 ring-1 ring-inset ring-rose-200" : ""}`}
+                  >
+                    {/* Day number */}
+                    <span className={`text-xs font-semibold mb-0.5 w-6 h-6 flex items-center justify-center rounded-full ${
+                      isToday ? "bg-[#9b6f6f] text-white" : isSelected ? "bg-rose-100 text-rose-700" : "text-[#1a1714]"
+                    }`}>
+                      {date.getDate()}
+                    </span>
 
-              {/* Hours label */}
-              <span className={`text-[8px] sm:text-[9px] font-medium leading-tight text-center ${labelClass}`}>
-                {label}
-              </span>
+                    {/* Hours label or saved flash */}
+                    {hasSavedFlash ? (
+                      <span className="text-[9px] font-semibold text-emerald-600">Saved ✓</span>
+                    ) : (
+                      <span className={`text-[8px] sm:text-[9px] font-medium leading-tight text-center ${labelClass}`}>
+                        {label}
+                      </span>
+                    )}
 
-              {/* Override dot */}
-              {hasOverride && (
-                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#c9a96e] rounded-full" />
-              )}
-            </button>
-          );
-        })}
+                    {/* Override dot */}
+                    {hasOverride && (
+                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#c9a96e] rounded-full" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Inline editor — shown below the week that contains the selected day */}
+            {selectedWeekIdx === weekIdx && selectedDay && (
+              <div className={`border-x border-b border-[#e8e2dc] rounded-b-xl bg-[#faf8f5] px-3 pb-3 ${weekIdx === weeks.length - 1 ? "" : "mb-px"}`}>
+                <InlineDayEditor
+                  dateKey={selectedDay}
+                  defaultHour={selectedDefaultHour}
+                  override={selectedOverride}
+                  onSaved={onEditorSaved}
+                  onDeleted={onEditorDeleted}
+                  onClose={onEditorClose}
+                  savedFlash={savedFlashDay === selectedDay}
+                />
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -538,6 +500,7 @@ export default function HoursPage() {
   const [overrides, setOverrides] = useState<OperationalHoursOverride[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [savedFlashDay, setSavedFlashDay] = useState<string | null>(null);
 
   const now = new Date();
   const [calYear, setCalYear] = useState(now.getFullYear());
@@ -567,18 +530,27 @@ export default function HoursPage() {
 
   function handleOverrideSaved(override: OperationalHoursOverride) {
     setOverrides((prev) => {
-      // Remove any existing single-day override for this date
       const filtered = prev.filter(
         (o) => !(o.effective_from === override.effective_from && o.effective_until === override.effective_until && o.day_of_week == null)
       );
       return [...filtered, override];
     });
+    // Flash "Saved ✓" on the cell then collapse
+    if (selectedDay) {
+      setSavedFlashDay(selectedDay);
+      setTimeout(() => setSavedFlashDay(null), 2000);
+    }
   }
 
   function handleOverrideDeleted(dateKey: string) {
     setOverrides((prev) =>
       prev.filter((o) => !(o.effective_from === dateKey && o.effective_until === dateKey && o.day_of_week == null))
     );
+  }
+
+  function handleDayClick(dateKey: string) {
+    // Toggle: clicking the same day collapses, clicking a new day switches
+    setSelectedDay((prev) => (prev === dateKey ? null : dateKey));
   }
 
   function prevMonth() {
@@ -591,18 +563,6 @@ export default function HoursPage() {
     else setCalMonth(m => m + 1);
   }
 
-  const selectedOverride = selectedDay
-    ? overrides.find((o) => o.effective_from === selectedDay && o.effective_until === selectedDay && o.day_of_week == null)
-    : undefined;
-
-  const selectedDayOfWeek = selectedDay
-    ? new Date(selectedDay + "T12:00:00").getDay()
-    : undefined;
-
-  const selectedDefaultHour = selectedDayOfWeek !== undefined
-    ? hours.find((h) => h.day_of_week === selectedDayOfWeek)
-    : undefined;
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -614,93 +574,90 @@ export default function HoursPage() {
   const hourMap = Object.fromEntries(hours.map((h) => [h.day_of_week, h]));
 
   return (
-    <>
-      {/* Day sheet */}
-      {selectedDay && (
-        <DaySheet
-          dateKey={selectedDay}
-          defaultHour={selectedDefaultHour}
-          override={selectedOverride}
-          onSaved={handleOverrideSaved}
-          onDeleted={handleOverrideDeleted}
-          onClose={() => setSelectedDay(null)}
-        />
-      )}
+    <div className="max-w-xl">
+      <div className="mb-6">
+        <h1 className="font-display text-3xl text-[#1a1714]">Operational Hours</h1>
+        <p className="text-[#8a7e78] text-sm mt-1">
+          Set your default weekly schedule, then tap any day to customize.
+        </p>
+      </div>
 
-      <div className="max-w-xl">
-        <div className="mb-6">
-          <h1 className="font-display text-3xl text-[#1a1714]">Operational Hours</h1>
-          <p className="text-[#8a7e78] text-sm mt-1">
-            Set your default weekly schedule, then tap any day to customize.
+      {/* Default Week */}
+      <div className="bg-white rounded-2xl border border-[#e8e2dc] overflow-hidden mb-6">
+        <div className="px-4 py-3 border-b border-[#f5f0eb]">
+          <p className="text-xs font-semibold text-[#c9a96e] uppercase tracking-widest">Default Week</p>
+          <p className="text-xs text-[#8a7e78] mt-0.5">Changes save automatically.</p>
+        </div>
+        <div className="divide-y divide-[#f5f0eb]">
+          {Array.from({ length: 7 }, (_, i) => (
+            <DayRow
+              key={i}
+              dayIndex={i}
+              hour={hourMap[i]}
+              onSaved={handleHourSaved}
+              onClosed={handleDayClosed}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Month Calendar */}
+      <div className="bg-white rounded-2xl border border-[#e8e2dc] p-4">
+        {/* Month nav */}
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={prevMonth}
+            className="p-2 rounded-full hover:bg-[#f5f0eb] transition-colors text-[#8a7e78]"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <p className="font-display text-base text-[#1a1714]">
+            {MONTH_NAMES[calMonth]} {calYear}
           </p>
+          <button
+            onClick={nextMonth}
+            className="p-2 rounded-full hover:bg-[#f5f0eb] transition-colors text-[#8a7e78]"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
 
-        {/* Default Week */}
-        <div className="bg-white rounded-2xl border border-[#e8e2dc] overflow-hidden mb-6">
-          <div className="px-4 py-3 border-b border-[#f5f0eb]">
-            <p className="text-xs font-semibold text-[#c9a96e] uppercase tracking-widest">Default Week</p>
-            <p className="text-xs text-[#8a7e78] mt-0.5">Changes save automatically.</p>
-          </div>
-          <div className="divide-y divide-[#f5f0eb]">
-            {Array.from({ length: 7 }, (_, i) => (
-              <DayRow
-                key={i}
-                dayIndex={i}
-                hour={hourMap[i]}
-                onSaved={handleHourSaved}
-                onClosed={handleDayClosed}
-              />
-            ))}
-          </div>
-        </div>
+        <MonthCalendar
+          year={calYear}
+          month={calMonth}
+          hours={hours}
+          overrides={overrides}
+          selectedDay={selectedDay}
+          savedFlashDay={savedFlashDay}
+          onDayClick={handleDayClick}
+          onEditorSaved={handleOverrideSaved}
+          onEditorDeleted={handleOverrideDeleted}
+          onEditorClose={() => setSelectedDay(null)}
+        />
 
-        {/* Month Calendar */}
-        <div className="bg-white rounded-2xl border border-[#e8e2dc] p-4">
-          {/* Month nav */}
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={prevMonth}
-              className="p-2 rounded-full hover:bg-[#f5f0eb] transition-colors text-[#8a7e78]"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <p className="font-display text-base text-[#1a1714]">
-              {MONTH_NAMES[calMonth]} {calYear}
-            </p>
-            <button
-              onClick={nextMonth}
-              className="p-2 rounded-full hover:bg-[#f5f0eb] transition-colors text-[#8a7e78]"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+        <div className="flex items-center gap-4 mt-4 px-1">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#c9a96e]" />
+            <span className="text-xs text-[#8a7e78]">Has override</span>
           </div>
-
-          <MonthCalendar
-            year={calYear}
-            month={calMonth}
-            hours={hours}
-            overrides={overrides}
-            onDayClick={(dateKey) => setSelectedDay(dateKey)}
-          />
-
-          <div className="flex items-center gap-4 mt-4 px-1">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#c9a96e]" />
-              <span className="text-xs text-[#8a7e78]">Has override</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-[#9b6f6f] flex items-center justify-center">
-                <span className="text-[8px] text-white font-bold">1</span>
-              </span>
-              <span className="text-xs text-[#8a7e78]">Today</span>
-            </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-[#9b6f6f] flex items-center justify-center">
+              <span className="text-[8px] text-white font-bold">1</span>
+            </span>
+            <span className="text-xs text-[#8a7e78]">Today</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-rose-100 ring-1 ring-rose-200 flex items-center justify-center">
+              <span className="text-[8px] text-rose-700 font-bold">5</span>
+            </span>
+            <span className="text-xs text-[#8a7e78]">Selected</span>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

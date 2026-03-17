@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
 interface ClientRow {
@@ -11,9 +11,15 @@ interface ClientRow {
   lastAppointment: string;
 }
 
+const PAGE_LIMIT = 20;
+
 export default function ClientsPage() {
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -22,20 +28,48 @@ export default function ClientsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
+  // Reset and fetch first page when search changes
   useEffect(() => {
     setLoading(true);
-    const qs = debouncedSearch ? `?q=${encodeURIComponent(debouncedSearch)}` : "";
-    fetch(`/api/admin/clients${qs}`)
+    setPage(1);
+    setClients([]);
+    const qs = new URLSearchParams({ page: "1", limit: String(PAGE_LIMIT) });
+    if (debouncedSearch) qs.set("q", debouncedSearch);
+    fetch(`/api/admin/clients?${qs}`)
       .then((r) => r.json())
-      .then(({ clients: c }) => setClients(c ?? []))
+      .then(({ clients: c, hasMore: more, total: t }) => {
+        setClients(c ?? []);
+        setHasMore(more ?? false);
+        setTotal(t ?? 0);
+      })
       .finally(() => setLoading(false));
   }, [debouncedSearch]);
+
+  const loadMore = useCallback(() => {
+    const nextPage = page + 1;
+    setLoadingMore(true);
+    const qs = new URLSearchParams({ page: String(nextPage), limit: String(PAGE_LIMIT) });
+    if (debouncedSearch) qs.set("q", debouncedSearch);
+    fetch(`/api/admin/clients?${qs}`)
+      .then((r) => r.json())
+      .then(({ clients: c, hasMore: more }) => {
+        setClients((prev) => [...prev, ...(c ?? [])]);
+        setHasMore(more ?? false);
+        setPage(nextPage);
+      })
+      .finally(() => setLoadingMore(false));
+  }, [page, debouncedSearch]);
 
   return (
     <div className="max-w-2xl">
       <div className="mb-6">
         <h1 className="font-display text-3xl text-[#1a1714]">Clients</h1>
-        <p className="text-[#8a7e78] text-sm mt-1">Everyone who has booked with you.</p>
+        <p className="text-[#8a7e78] text-sm mt-1">
+          Everyone who has booked with you.
+          {total > 0 && !loading && (
+            <span className="ml-1 text-[#c9a96e] font-medium">{total} total</span>
+          )}
+        </p>
       </div>
 
       {/* Search */}
@@ -71,54 +105,76 @@ export default function ClientsPage() {
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-[#e8e2dc] divide-y divide-[#f5f0eb] overflow-hidden">
-          {clients.map((c) => (
-            <Link
-              key={c.id}
-              href={`/admin/clients/${c.id}`}
-              className="flex items-center gap-4 px-5 py-4 hover:bg-[#faf9f7] transition-colors"
-            >
-              {/* Avatar */}
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#f5ede8] to-[#e8d8d0] flex items-center justify-center flex-shrink-0 border border-[#e8e2dc]">
-                <span className="text-[#9b6f6f] font-semibold text-base">
-                  {(c.full_name ?? c.email ?? "?").charAt(0).toUpperCase()}
-                </span>
-              </div>
+        <>
+          <div className="bg-white rounded-2xl border border-[#e8e2dc] divide-y divide-[#f5f0eb] overflow-hidden">
+            {clients.map((c) => (
+              <Link
+                key={c.id}
+                href={`/admin/clients/${c.id}`}
+                className="flex items-center gap-4 px-5 py-4 hover:bg-[#faf9f7] transition-colors"
+              >
+                {/* Avatar */}
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#f5ede8] to-[#e8d8d0] flex items-center justify-center flex-shrink-0 border border-[#e8e2dc]">
+                  <span className="text-[#9b6f6f] font-semibold text-base">
+                    {(c.full_name ?? c.email ?? "?").charAt(0).toUpperCase()}
+                  </span>
+                </div>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#1a1714] truncate">
-                  {c.full_name ?? "(no name)"}
-                </p>
-                <p className="text-xs text-[#8a7e78] truncate">{c.email ?? "—"}</p>
-              </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#1a1714] truncate">
+                    {c.full_name ?? "(no name)"}
+                  </p>
+                  <p className="text-xs text-[#8a7e78] truncate">{c.email ?? "—"}</p>
+                </div>
 
-              {/* Stats */}
-              <div className="text-right flex-shrink-0">
-                <p className="text-sm font-semibold text-[#1a1714]">{c.totalAppointments}</p>
-                <p className="text-xs text-[#8a7e78]">
-                  {c.totalAppointments === 1 ? "visit" : "visits"}
-                </p>
-              </div>
+                {/* Stats */}
+                <div className="text-right flex-shrink-0">
+                  <p className="text-sm font-semibold text-[#1a1714]">{c.totalAppointments}</p>
+                  <p className="text-xs text-[#8a7e78]">
+                    {c.totalAppointments === 1 ? "visit" : "visits"}
+                  </p>
+                </div>
 
-              {/* Last date */}
-              <div className="text-right flex-shrink-0 hidden sm:block">
-                <p className="text-xs text-[#8a7e78]">Last visit</p>
-                <p className="text-xs font-medium text-[#1a1714]">
-                  {new Date(c.lastAppointment).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: new Date(c.lastAppointment).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
-                  })}
-                </p>
-              </div>
+                {/* Last date */}
+                <div className="text-right flex-shrink-0 hidden sm:block">
+                  <p className="text-xs text-[#8a7e78]">Last visit</p>
+                  <p className="text-xs font-medium text-[#1a1714]">
+                    {new Date(c.lastAppointment).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: new Date(c.lastAppointment).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
+                    })}
+                  </p>
+                </div>
 
-              <svg className="w-4 h-4 text-[#c9a96e] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          ))}
-        </div>
+                <svg className="w-4 h-4 text-[#c9a96e] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            ))}
+          </div>
+
+          {/* Load more */}
+          {hasMore && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="px-6 py-2.5 border border-[#e8e2dc] bg-white text-sm font-medium text-[#1a1714] rounded-full hover:bg-[#f5f0eb] disabled:opacity-50 transition-colors"
+              >
+                {loadingMore ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-[#9b6f6f] border-t-transparent rounded-full animate-spin" />
+                    Loading…
+                  </span>
+                ) : (
+                  `Load more (${total - clients.length} remaining)`
+                )}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

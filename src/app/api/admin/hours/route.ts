@@ -1,5 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
+// ─── Zod validation ──────────────────────────────────────────────────────────
+
+const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const PostHoursSchema = z.object({
+  day_of_week: z.number().int().min(0).max(6),
+  open_time: z.string().regex(timeRegex, "open_time must be in HH:MM format"),
+  close_time: z.string().regex(timeRegex, "close_time must be in HH:MM format"),
+});
 
 async function getStylistId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data } = await supabase
@@ -40,6 +51,7 @@ export async function GET() {
   ]);
 
   if (hoursResult.error) {
+    console.error("[api/admin/hours GET]", { error: hoursResult.error.message, userId: user.id });
     return NextResponse.json({ error: hoursResult.error.message }, { status: 500 });
   }
 
@@ -68,19 +80,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
-  const { day_of_week, open_time, close_time } = body as {
-    day_of_week: number;
-    open_time: string;
-    close_time: string;
-  };
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
-  if (day_of_week < 0 || day_of_week > 6) {
-    return NextResponse.json({ error: "Invalid day_of_week" }, { status: 400 });
+  const parsed = PostHoursSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "validation failed", details: parsed.error.issues.map((e) => ({ path: e.path.join("."), message: e.message })) },
+      { status: 400 }
+    );
   }
-  if (!open_time || !close_time) {
-    return NextResponse.json({ error: "open_time and close_time are required" }, { status: 400 });
-  }
+
+  const { day_of_week, open_time, close_time } = parsed.data;
 
   // Upsert — one row per stylist+day
   const { data, error } = await supabase
@@ -93,6 +108,7 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    console.error("[api/admin/hours POST]", { error: error.message, userId: user.id, day_of_week });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

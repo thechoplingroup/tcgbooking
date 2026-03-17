@@ -1,5 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
+// ─── Zod validation ──────────────────────────────────────────────────────────
+
+const PostServiceSchema = z.object({
+  name: z.string().min(1, "name is required").max(100, "name max 100 characters"),
+  duration_minutes: z.number().int().min(1, "duration_minutes min 1").max(480, "duration_minutes max 480"),
+  internal_price_cents: z.number().int().min(0, "internal_price_cents min 0").max(999999, "internal_price_cents max 999999").optional().default(0),
+});
 
 async function getStylistId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data } = await supabase
@@ -33,6 +42,7 @@ export async function GET() {
     .order("created_at");
 
   if (error) {
+    console.error("[api/admin/services GET]", { error: error.message, userId: user.id });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -58,19 +68,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
-  const { name, duration_minutes, internal_price_cents } = body as {
-    name: string;
-    duration_minutes: number;
-    internal_price_cents: number;
-  };
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
-  if (!name?.trim()) {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  const parsed = PostServiceSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "validation failed", details: parsed.error.issues.map((e) => ({ path: e.path.join("."), message: e.message })) },
+      { status: 400 }
+    );
   }
-  if (!duration_minutes || duration_minutes < 1) {
-    return NextResponse.json({ error: "duration_minutes must be at least 1" }, { status: 400 });
-  }
+
+  const { name, duration_minutes, internal_price_cents } = parsed.data;
 
   const { data, error } = await supabase
     .from("services")
@@ -78,12 +91,13 @@ export async function POST(request: Request) {
       stylist_id: stylistId,
       name: name.trim(),
       duration_minutes,
-      internal_price_cents: internal_price_cents ?? 0,
+      internal_price_cents,
     })
     .select()
     .single();
 
   if (error) {
+    console.error("[api/admin/services POST]", { error: error.message, userId: user.id, name });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
