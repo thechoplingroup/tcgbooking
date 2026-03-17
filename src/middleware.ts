@@ -31,19 +31,37 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Protect admin routes
-  if (pathname.startsWith("/admin") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  // Unauthenticated — redirect to login
+  if (!user) {
+    if (
+      pathname.startsWith("/admin") ||
+      pathname.startsWith("/book") ||
+      pathname.startsWith("/appointments")
+    ) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return supabaseResponse;
   }
 
-  // Protect booking routes
-  if (pathname.startsWith("/book") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  // Check role for authenticated users
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const role = profile?.role;
+
+  // Stylists should always go to /admin — redirect away from client pages
+  if (role === "stylist") {
+    if (pathname.startsWith("/book") || pathname.startsWith("/appointments")) {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
   }
 
-  // Protect client appointments route
-  if (pathname.startsWith("/appointments") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  // Clients should not access admin
+  if (role === "client" && pathname.startsWith("/admin")) {
+    return NextResponse.redirect(new URL("/book", request.url));
   }
 
   return supabaseResponse;
