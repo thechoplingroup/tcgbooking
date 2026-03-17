@@ -18,7 +18,7 @@ async function handleRateLimit(request: NextRequest): Promise<NextResponse | nul
     const { bookingRateLimit, apiRateLimit, checkRateLimit } = await import("@/lib/ratelimit");
     const ip = getIP(request);
 
-    // Stricter limit for booking endpoint
+    // Only rate limit the booking submission endpoint
     if (pathname === "/api/appointments") {
       const result = await checkRateLimit(bookingRateLimit, ip);
       if (!result.success) {
@@ -27,15 +27,6 @@ async function handleRateLimit(request: NextRequest): Promise<NextResponse | nul
           { status: 429 }
         );
       }
-    }
-
-    // General API rate limit
-    const result = await checkRateLimit(apiRateLimit, ip);
-    if (!result.success) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: 429 }
-      );
     }
   } catch {
     // Fail open if rate limiting errors
