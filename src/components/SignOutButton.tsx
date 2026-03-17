@@ -21,7 +21,7 @@ export default function SignOutButton({ variant = "button" }: Props) {
     return (
       <button
         onClick={handleSignOut}
-        className="text-xs text-gray-400 hover:text-gray-600"
+        className="text-xs text-[#8a7e78] hover:text-[#9b6f6f] transition-colors"
       >
         Sign out
       </button>
@@ -31,7 +31,7 @@ export default function SignOutButton({ variant = "button" }: Props) {
   return (
     <button
       onClick={handleSignOut}
-      className="text-sm text-gray-600 hover:text-gray-900"
+      className="text-sm text-[#8a7e78] hover:text-[#9b6f6f] transition-colors"
     >
       Sign out
     </button>

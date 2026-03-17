@@ -9,6 +9,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        display: ["var(--font-playfair)", "Georgia", "serif"],
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
@@ -43,6 +47,14 @@ const config: Config = {
         border: "var(--border)",
         input: "var(--input)",
         ring: "var(--ring)",
+        salon: {
+          rose: "#9b6f6f",
+          blush: "#f5ede8",
+          gold: "#c9a96e",
+          dark: "#1a1714",
+          muted: "#8a7e78",
+          warm: "#faf9f7",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

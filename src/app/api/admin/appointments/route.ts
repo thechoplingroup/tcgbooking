@@ -31,14 +31,17 @@ export async function GET(request: Request) {
       `
       *,
       client:profiles!client_id(id, full_name),
-      service:services!service_id(id, name, duration_minutes)
+      service:services!service_id(id, name, duration_minutes, internal_price_cents)
     `
     )
     .eq("stylist_id", stylist.id)
     .order("start_at");
 
-  if (status) {
-    query = query.eq("status", status);
+  if (status === "all") {
+    // All appointments, no filter
+    query = query.gte("start_at", new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString());
+  } else if (status === "cancelled") {
+    query = query.eq("status", "cancelled");
   } else {
     // Default: upcoming only (confirmed + pending)
     query = query
