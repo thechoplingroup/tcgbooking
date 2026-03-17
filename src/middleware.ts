@@ -1,20 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-function getIP(request: NextRequest): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-}
 
-async function handleRateLimit(_request: NextRequest): Promise<NextResponse | null> {
-  // Rate limiting disabled
-  return null;
-}
 
 export async function middleware(request: NextRequest) {
   // Rate limit API routes first
-  const rateLimitResponse = await handleRateLimit(request);
-  if (rateLimitResponse) return rateLimitResponse;
-
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
