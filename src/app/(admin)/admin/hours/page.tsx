@@ -164,8 +164,18 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
 
   // Prevent background scroll when sheet is open
   useEffect(() => {
+    const scrollY = window.scrollY;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, scrollY);
+    };
   }, []);
   const initOpen = override ? !override.is_closed : !!defaultHour;
   const initOpenTime = override?.open_time?.slice(0, 5) ?? defaultHour?.open_time?.slice(0, 5) ?? "09:00";
@@ -267,7 +277,7 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} onTouchMove={(e) => e.stopPropagation()} />
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl max-h-[90vh] flex flex-col">
         <div className="sticky top-0 bg-white pt-4 px-5 pb-3 border-b border-[#f5f0eb] z-10">
           <div className="w-10 h-1 bg-[#e8e2dc] rounded-full mx-auto mb-3" />
