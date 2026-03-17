@@ -178,7 +178,7 @@ export default function ClientDetailPage({ params }: { params: { clientId: strin
       )}
       {/* Rebook sheet */}
       {showRebook && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl p-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-w-2xl mx-auto lg:inset-x-auto lg:w-[600px] lg:left-1/2 lg:-translate-x-1/2">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl p-5 max-w-2xl mx-auto lg:inset-x-auto lg:w-[600px] lg:left-1/2 lg:-translate-x-1/2" style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}>
           <div className="w-10 h-1 bg-[#e8e2dc] rounded-full mx-auto mb-4" />
           <h3 className="font-display text-lg text-[#1a1714] mb-1">Send Rebooking Reminder</h3>
           <p className="text-xs text-[#8a7e78] mb-4">to {client.email}</p>

@@ -392,7 +392,7 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
         </div>
 
         {/* Sticky action buttons — always visible above bottom nav */}
-        <div className="px-5 pt-3 pb-4 border-t border-[#f5f0eb] bg-white flex gap-2" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+        <div className="px-5 pt-3 border-t border-[#f5f0eb] bg-white flex gap-2" style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}>
           <button
             onClick={handleSave}
             disabled={saving}
