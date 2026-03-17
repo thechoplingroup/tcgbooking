@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 // Service → rebooking interval mapping
@@ -50,8 +50,8 @@ interface Stats {
   firstBooking: string | null;
 }
 
-export default function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
-  const { clientId } = use(params);
+export default function ClientDetailPage({ params }: { params: { clientId: string } }) {
+  const { clientId } = params;
   const [client, setClient] = useState<ClientDetail | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [appointments, setAppointments] = useState<AppointmentRow[]>([]);

@@ -296,7 +296,7 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
           </div>
         </div>
 
-        <div className="p-5 space-y-5 overflow-y-auto flex-1 pb-2">
+        <div className="p-5 space-y-5 overflow-y-auto flex-1 pb-2" style={{ WebkitOverflowScrolling: 'touch' } as never}>
           {/* Open / Closed toggle */}
           <div className="flex gap-2">
             <button
