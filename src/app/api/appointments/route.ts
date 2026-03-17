@@ -2,8 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { sendBookingConfirmation } from "@/lib/email";
 import { z } from "zod";
-import { bookingRateLimit, checkRateLimit } from "@/lib/ratelimit";
-import { headers } from "next/headers";
+
 
 const RATE_LIMIT_MAX = 10; // max bookings per day per client
 
@@ -52,20 +51,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   // IP-based rate limit for bookings
-  try {
-    const hdrs = await headers();
-    const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-    const rl = await checkRateLimit(bookingRateLimit, ip);
-    if (!rl.success) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: 429 }
-      );
-    }
-  } catch {
-    // Fail open if rate limiting unavailable
-  }
-
   const supabase = await createClient();
   const {
     data: { user },

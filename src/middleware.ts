@@ -5,33 +5,8 @@ function getIP(request: NextRequest): string {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 }
 
-async function handleRateLimit(request: NextRequest): Promise<NextResponse | null> {
-  // Skip rate limiting if Upstash env vars are missing
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    return null;
-  }
-
-  const pathname = request.nextUrl.pathname;
-  if (!pathname.startsWith("/api/")) return null;
-
-  try {
-    const { bookingRateLimit, checkRateLimit } = await import("@/lib/ratelimit");
-    const ip = getIP(request);
-
-    // Only rate limit the booking submission endpoint
-    if (pathname === "/api/appointments") {
-      const result = await checkRateLimit(bookingRateLimit, ip);
-      if (!result.success) {
-        return NextResponse.json(
-          { error: "Too many requests. Please try again later." },
-          { status: 429 }
-        );
-      }
-    }
-  } catch {
-    // Fail open if rate limiting errors
-  }
-
+async function handleRateLimit(_request: NextRequest): Promise<NextResponse | null> {
+  // Rate limiting disabled
   return null;
 }
 
