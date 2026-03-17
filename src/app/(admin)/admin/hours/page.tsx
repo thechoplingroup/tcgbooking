@@ -262,7 +262,7 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-xl max-h-[90vh] flex flex-col">
         <div className="sticky top-0 bg-white pt-4 px-5 pb-3 border-b border-[#f5f0eb] z-10">
           <div className="w-10 h-1 bg-[#e8e2dc] rounded-full mx-auto mb-3" />
           <div className="flex items-center justify-between">
@@ -280,7 +280,7 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
           </div>
         </div>
 
-        <div className="p-5 space-y-5">
+        <div className="p-5 space-y-5 overflow-y-auto flex-1 pb-2">
           {/* Open / Closed toggle */}
           <div className="flex gap-2">
             <button
@@ -373,27 +373,27 @@ function DaySheet({ dateKey, defaultHour, override, onSaved, onDeleted, onClose 
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 py-2.5 bg-[#9b6f6f] text-white text-sm font-semibold rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-all"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-            {override && (
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-4 py-2.5 border border-red-200 text-red-600 text-sm font-medium rounded-full hover:bg-red-50 disabled:opacity-50 transition-colors"
-              >
-                {deleting ? "…" : "Clear override"}
-              </button>
-            )}
-          </div>
         </div>
-        <div style={{ height: "env(safe-area-inset-bottom)" }} />
+
+        {/* Sticky action buttons — always visible above bottom nav */}
+        <div className="px-5 pt-3 pb-4 border-t border-[#f5f0eb] bg-white flex gap-2" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 py-3 bg-[#9b6f6f] text-white text-sm font-semibold rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-all"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          {override && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-4 py-3 border border-red-200 text-red-600 text-sm font-medium rounded-full hover:bg-red-50 disabled:opacity-50 transition-colors"
+            >
+              {deleting ? "…" : "Clear"}
+            </button>
+          )}
+        </div>
       </div>
     </>
   );
