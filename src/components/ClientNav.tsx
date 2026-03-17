@@ -42,7 +42,7 @@ export default function ClientNav() {
           {/* Account icon */}
           <Link
             href="/account"
-            className={`flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${
+            className={`flex items-center justify-center w-11 h-11 rounded-xl transition-all active:scale-95 ${
               pathname === "/account"
                 ? "text-[#9b6f6f] bg-[#f5ede8]"
                 : "text-[#8a7e78] hover:text-[#9b6f6f] hover:bg-[#faf9f7]"

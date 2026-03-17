@@ -176,7 +176,7 @@ export default function ServicesPage() {
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-1.5 px-4 py-2.5 bg-[#9b6f6f] text-white text-sm font-medium rounded-full hover:bg-[#8a5f5f] transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-[#9b6f6f] text-white text-sm font-medium rounded-full hover:bg-[#8a5f5f] transition-all active:scale-95 min-h-[44px]"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -209,7 +209,7 @@ export default function ServicesPage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 placeholder="e.g. Balayage"
-                className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
+                className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
               />
             </div>
             <div>
@@ -219,7 +219,7 @@ export default function ServicesPage() {
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
                 required min={1}
-                className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
+                className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
               />
             </div>
             <div>
@@ -229,7 +229,7 @@ export default function ServicesPage() {
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 required min={0} step="1"
-                className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
+                className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
               />
             </div>
           </div>
@@ -237,14 +237,14 @@ export default function ServicesPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 bg-[#9b6f6f] text-white text-sm font-medium rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-colors"
+              className="px-5 py-2.5 bg-[#9b6f6f] text-white text-sm font-medium rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-all active:scale-95 min-h-[44px]"
             >
               {submitting ? "Adding…" : "Add Service"}
             </button>
             <button
               type="button"
               onClick={() => setShowAddForm(false)}
-              className="px-5 py-2 border border-[#e8e2dc] text-sm text-[#8a7e78] font-medium rounded-full hover:bg-[#f5ede8] transition-colors"
+              className="px-5 py-2.5 border border-[#e8e2dc] text-sm text-[#8a7e78] font-medium rounded-full hover:bg-[#f5ede8] transition-all active:scale-95 min-h-[44px]"
             >
               Cancel
             </button>

@@ -100,7 +100,7 @@ function RescheduleSheet({
             <h3 className="font-display text-lg text-[#1a1714]">Request Reschedule</h3>
             <p className="text-xs text-[#8a7e78] mt-0.5">{appt.service?.name}</p>
           </div>
-          <button onClick={onClose} className="p-2 text-[#8a7e78] hover:text-[#1a1714]">
+          <button onClick={onClose} className="p-2 text-[#8a7e78] hover:text-[#1a1714] min-h-[44px] min-w-[44px] flex items-center justify-center">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -272,7 +272,7 @@ export default function AppointmentsPage() {
                           {(appt.status === "pending" || appt.status === "confirmed") && !rescheduledIds.has(appt.id) ? (
                             <button
                               onClick={() => setRescheduleAppt(appt)}
-                              className="text-xs text-[#8a7e78] hover:text-[#9b6f6f] font-medium border border-[#e8e2dc] px-3 py-1.5 rounded-full hover:border-[#9b6f6f] transition-all"
+                              className="text-xs text-[#8a7e78] hover:text-[#9b6f6f] font-medium border border-[#e8e2dc] px-3 py-2 rounded-full hover:border-[#9b6f6f] transition-all active:scale-95 min-h-[36px]"
                             >
                               Request Reschedule
                             </button>

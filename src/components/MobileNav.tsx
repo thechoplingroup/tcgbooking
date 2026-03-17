@@ -29,7 +29,7 @@ export default function MobileNav({ items }: Props) {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        className="p-2 rounded-lg hover:bg-gray-100 transition-all active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center"
         aria-label="Toggle menu"
       >
         {open ? (
@@ -57,7 +57,7 @@ export default function MobileNav({ items }: Props) {
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 min-h-[44px] flex items-center"
               >
                 {item.label}
               </Link>
@@ -65,7 +65,7 @@ export default function MobileNav({ items }: Props) {
             <div className="border-t mt-2 pt-2">
               <button
                 onClick={handleSignOut}
-                className="block w-full text-left px-4 py-2.5 text-sm text-gray-500 hover:bg-gray-50"
+                className="block w-full text-left px-4 py-2.5 text-sm text-gray-500 hover:bg-gray-50 min-h-[44px]"
               >
                 Sign out
               </button>

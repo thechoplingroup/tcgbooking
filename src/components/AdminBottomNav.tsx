@@ -57,6 +57,16 @@ const PRIMARY_TABS = [
 
 const MORE_ITEMS = [
   {
+    href: "/admin/analytics",
+    label: "Analytics",
+    icon: (
+      <svg className="w-5 h-5 text-[#8a7e78]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/services",
     label: "Services",
     icon: (
@@ -117,7 +127,7 @@ export default function AdminBottomNav({ pendingCount }: Props) {
                   key={item.href}
                   href={item.href}
                   onClick={() => setShowMore(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all active:scale-[0.98] min-h-[44px] ${
                     active ? "bg-[#f5ede8] text-[#9b6f6f]" : "text-[#1a1714] hover:bg-[#f5f0eb]"
                   }`}
                 >
@@ -145,7 +155,7 @@ export default function AdminBottomNav({ pendingCount }: Props) {
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 relative transition-colors ${
+                className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 relative transition-all active:opacity-70 min-h-[48px] ${
                   active ? "text-[#9b6f6f]" : "text-[#8a7e78]"
                 }`}
               >
@@ -170,7 +180,7 @@ export default function AdminBottomNav({ pendingCount }: Props) {
           {/* More button */}
           <button
             onClick={() => setShowMore(!showMore)}
-            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 relative transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 relative transition-all active:opacity-70 min-h-[48px] ${
               isMoreActive || showMore ? "text-[#9b6f6f]" : "text-[#8a7e78]"
             }`}
           >

@@ -330,7 +330,7 @@ export default function StylistBookingPage() {
               href={calUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-3 bg-[#f5ede8] text-[#9b6f6f] font-medium rounded-full hover:bg-[#ede0d8] transition-colors text-sm mb-3 border border-[#e8d8d0]"
+              className="flex items-center justify-center gap-2 w-full py-3 bg-[#f5ede8] text-[#9b6f6f] font-medium rounded-full hover:bg-[#ede0d8] transition-all active:scale-[0.98] text-sm mb-3 border border-[#e8d8d0] min-h-[48px]"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -349,7 +349,7 @@ export default function StylistBookingPage() {
 
           <button
             onClick={() => { setStep("service"); setSelectedService(null); setSelectedDate(null); setSelectedSlot(null); setSlots([]); setClientNotes(""); }}
-            className="px-6 py-2.5 border border-[#e8e2dc] text-[#5c4a42] text-sm font-medium rounded-full hover:bg-[#f5ede8] transition-colors"
+            className="px-6 py-2.5 border border-[#e8e2dc] text-[#5c4a42] text-sm font-medium rounded-full hover:bg-[#f5ede8] transition-all active:scale-[0.98] min-h-[44px]"
           >
             Book another
           </button>
@@ -404,7 +404,7 @@ export default function StylistBookingPage() {
       {step === "date" && selectedService && (
         <div>
           <button onClick={() => { setStep("service"); setSelectedDate(null); }}
-            className="flex items-center gap-1.5 text-sm text-[#8a7e78] hover:text-[#9b6f6f] mb-5 transition-colors">
+            className="flex items-center gap-1.5 text-sm text-[#8a7e78] hover:text-[#9b6f6f] mb-5 transition-all active:opacity-70 min-h-[44px]">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -487,7 +487,7 @@ export default function StylistBookingPage() {
       {step === "slots" && selectedService && selectedDate && (
         <div>
           <button onClick={() => { setStep("date"); setSelectedDate(null); setSlots([]); }}
-            className="flex items-center gap-1.5 text-sm text-[#8a7e78] hover:text-[#9b6f6f] mb-5 transition-colors">
+            className="flex items-center gap-1.5 text-sm text-[#8a7e78] hover:text-[#9b6f6f] mb-5 transition-all active:opacity-70 min-h-[44px]">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -514,7 +514,7 @@ export default function StylistBookingPage() {
               <p className="text-[#1a1714] font-medium mb-1">No availability on this day</p>
               <p className="text-sm text-[#8a7e78] mb-4">Please choose another date.</p>
               <button onClick={() => { setStep("date"); setSelectedDate(null); setSlots([]); }}
-                className="px-5 py-2 border border-[#e8e2dc] text-sm font-medium text-[#5c4a42] rounded-full hover:bg-[#f5ede8] transition-colors">
+                className="px-5 py-2 border border-[#e8e2dc] text-sm font-medium text-[#5c4a42] rounded-full hover:bg-[#f5ede8] transition-all active:scale-[0.98] min-h-[44px]">
                 Choose another date
               </button>
             </div>
@@ -538,7 +538,7 @@ export default function StylistBookingPage() {
       {step === "confirm" && selectedService && selectedDate && selectedSlot && (
         <div>
           <button onClick={() => { setStep("slots"); setSelectedSlot(null); }}
-            className="flex items-center gap-1.5 text-sm text-[#8a7e78] hover:text-[#9b6f6f] mb-5 transition-colors">
+            className="flex items-center gap-1.5 text-sm text-[#8a7e78] hover:text-[#9b6f6f] mb-5 transition-all active:opacity-70 min-h-[44px]">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -585,7 +585,7 @@ export default function StylistBookingPage() {
               maxLength={300}
               rows={3}
               placeholder="e.g. I want to go lighter, or I have a sensitive scalp…"
-              className="w-full border border-[#e8e2dc] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-white resize-none leading-relaxed"
+              className="w-full border border-[#e8e2dc] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-white resize-none leading-relaxed"
             />
             <p className="text-xs text-[#8a7e78] mt-1 text-right">{clientNotes.length}/300</p>
           </div>

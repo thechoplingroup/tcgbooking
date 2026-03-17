@@ -123,7 +123,7 @@ async function processAppointments(supabase: any, appointments: any[], errors: s
 
   // We need client emails — profiles table has id but not email directly.
   // Get emails from auth via Supabase admin API
-  const clientIds = [...new Set(appointments.map((a: { client_id: string }) => a.client_id))];
+  const clientIds = Array.from(new Set(appointments.map((a: { client_id: string }) => a.client_id)));
   const emailMap = new Map<string, string>();
 
   for (const clientId of clientIds) {

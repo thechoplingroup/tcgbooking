@@ -61,7 +61,7 @@ function LoginForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border border-[#e8e2dc] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
+          className="w-full border border-[#e8e2dc] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
           placeholder="you@example.com"
         />
       </div>
@@ -69,7 +69,7 @@ function LoginForm() {
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="block text-sm font-medium text-[#5c4a42]">Password</label>
-          <Link href="/reset-password" className="text-xs text-[#9b6f6f] hover:text-[#8a5f5f]">
+          <Link href="/reset-password" className="text-xs text-[#9b6f6f] hover:text-[#8a5f5f] min-h-[44px] flex items-center">
             Forgot password?
           </Link>
         </div>
@@ -78,7 +78,7 @@ function LoginForm() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border border-[#e8e2dc] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
+          className="w-full border border-[#e8e2dc] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
           placeholder="••••••••"
         />
       </div>
@@ -92,7 +92,7 @@ function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3.5 bg-[#9b6f6f] text-white font-semibold rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-colors text-sm"
+        className="w-full py-3.5 bg-[#9b6f6f] text-white font-semibold rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-all active:scale-[0.98] text-sm min-h-[48px]"
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">
