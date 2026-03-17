@@ -20,12 +20,20 @@ export default async function ClientLayout({
             </div>
           </Link>
 
-          <Link
-            href="/book"
-            className="inline-flex items-center px-4 py-2 bg-[#9b6f6f] text-white text-sm font-medium rounded-full hover:bg-[#8a5f5f] transition-colors"
-          >
-            Book Now
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/appointments"
+              className="text-sm text-[#8a7e78] hover:text-[#9b6f6f] font-medium transition-colors hidden sm:block"
+            >
+              My Appointments
+            </Link>
+            <Link
+              href="/book"
+              className="inline-flex items-center px-4 py-2 bg-[#9b6f6f] text-white text-sm font-medium rounded-full hover:bg-[#8a5f5f] transition-colors"
+            >
+              Book Now
+            </Link>
+          </div>
         </div>
       </nav>
 

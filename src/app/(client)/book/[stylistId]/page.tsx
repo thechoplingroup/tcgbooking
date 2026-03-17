@@ -383,7 +383,7 @@ export default function StylistBookingPage() {
                   <p className={`text-sm font-semibold mt-0.5 ${isClosed ? "text-[#8a7e78]" : "text-[#1a1714]"}`}>
                     {monthDay.split(" ")[1]}
                   </p>
-                  <p className={`text-[10px] mt-0.5 ${isClosed ? "text-[#8a7e78]" : "text-[#8a7e78]"}`}>
+                  <p className="text-[10px] mt-0.5 text-[#8a7e78]">
                     {monthDay.split(" ")[0]}
                   </p>
                   {isToday && !isClosed && (

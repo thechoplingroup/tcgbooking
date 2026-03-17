@@ -23,6 +23,7 @@ export default function HoursPage() {
   const [openTime, setOpenTime] = useState("09:00");
   const [closeTime, setCloseTime] = useState("18:00");
   const [showForm, setShowForm] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => { loadHours(); }, []);
 
@@ -59,10 +60,10 @@ export default function HoursPage() {
     }
   }
 
-  async function handleDelete(id: string, dayIndex: number) {
-    if (!confirm(`Remove hours for ${DAYS[dayIndex]}?`)) return;
+  async function handleDelete(id: string) {
     await fetch(`/api/admin/hours/${id}`, { method: "DELETE" });
     setHours((prev) => prev.filter((h) => h.id !== id));
+    setConfirmDeleteId(null);
   }
 
   const configuredDaySet = new Set(hours.map((h) => h.day_of_week));
@@ -224,12 +225,30 @@ export default function HoursPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => handleDelete(h.id, h.day_of_week)}
-                className="text-xs text-[#8a7e78] hover:text-red-600 transition-colors"
-              >
-                Remove
-              </button>
+              {confirmDeleteId === h.id ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[#8a7e78]">Remove?</span>
+                  <button
+                    onClick={() => handleDelete(h.id)}
+                    className="text-xs text-red-600 font-semibold hover:text-red-700 transition-colors"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="text-xs text-[#8a7e78] hover:text-[#5c4a42] transition-colors"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDeleteId(h.id)}
+                  className="text-xs text-[#8a7e78] hover:text-red-600 transition-colors"
+                >
+                  Remove
+                </button>
+              )}
             </div>
           ))}
         </div>

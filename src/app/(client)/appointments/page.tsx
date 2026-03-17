@@ -110,8 +110,10 @@ export default function AppointmentsPage() {
     );
   }
 
-  const upcoming = appointments.filter((a) => a.status !== "cancelled");
-  const past = appointments.filter((a) => a.status === "cancelled");
+  const now = new Date().toISOString();
+  const upcoming = appointments.filter((a) => a.status !== "cancelled" && a.start_at >= now);
+  const past = appointments.filter((a) => a.status !== "cancelled" && a.start_at < now);
+  const cancelled = appointments.filter((a) => a.status === "cancelled");
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -222,10 +224,37 @@ export default function AppointmentsPage() {
           {past.length > 0 && (
             <div>
               <h2 className="text-xs font-semibold text-[#8a7e78] uppercase tracking-widest mb-3">
-                Cancelled
+                Past
               </h2>
               <div className="space-y-2 opacity-60">
-                {past.map((appt) => (
+                {past.map((appt) => {
+                  const status = STATUS_CONFIG[appt.status] ?? STATUS_CONFIG["pending"]!;
+                  return (
+                    <div
+                      key={appt.id}
+                      className="bg-white rounded-xl border border-[#e8e2dc] px-4 py-3 flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-[#1a1714]">{appt.service?.name}</p>
+                        <p className="text-xs text-[#8a7e78]">{formatDateTime(appt.start_at)}</p>
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.bg} ${status.text}`}>
+                        {status.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {cancelled.length > 0 && (
+            <div>
+              <h2 className="text-xs font-semibold text-[#8a7e78] uppercase tracking-widest mb-3">
+                Cancelled
+              </h2>
+              <div className="space-y-2 opacity-50">
+                {cancelled.map((appt) => (
                   <div
                     key={appt.id}
                     className="bg-white rounded-xl border border-[#e8e2dc] px-4 py-3 flex items-center justify-between"
