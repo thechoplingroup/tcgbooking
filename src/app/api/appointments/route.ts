@@ -5,7 +5,7 @@ import { z } from "zod";
 import { bookingRateLimit, checkRateLimit } from "@/lib/ratelimit";
 import { headers } from "next/headers";
 
-const RATE_LIMIT_MAX = 3; // max bookings per day per client
+const RATE_LIMIT_MAX = 10; // max bookings per day per client
 
 // ─── Zod validation ──────────────────────────────────────────────────────────
 
