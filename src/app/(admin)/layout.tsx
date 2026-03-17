@@ -4,7 +4,7 @@ import AdminSignOutButton from "@/components/AdminSignOutButton";
 import AdminBottomNav from "@/components/AdminBottomNav";
 import { ToastProvider } from "@/components/Toast";
 
-const NAV_ITEMS = [
+const NAV_MAIN = [
   {
     href: "/admin",
     label: "Schedule",
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/appointments",
     label: "Requests",
+    exact: false,
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -27,8 +28,34 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/admin/clients",
+    label: "Clients",
+    exact: false,
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/blocked-times",
+    label: "Blocked Times",
+    exact: false,
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+          d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+      </svg>
+    ),
+  },
+];
+
+const NAV_SETTINGS = [
+  {
     href: "/admin/services",
     label: "Services",
+    exact: false,
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -39,6 +66,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/hours",
     label: "Hours",
+    exact: false,
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -49,6 +77,7 @@ const NAV_ITEMS = [
   {
     href: "/admin/profile",
     label: "Profile",
+    exact: false,
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -130,8 +159,8 @@ export default async function AdminLayout({
             </div>
           </div>
 
-          <nav className="flex-1 py-4 px-3">
-            {NAV_ITEMS.map((item) => {
+          <nav className="flex-1 py-4 px-3 overflow-y-auto">
+            {NAV_MAIN.map((item) => {
               const isRequests = item.href === "/admin/appointments";
               return (
                 <Link
@@ -151,6 +180,22 @@ export default async function AdminLayout({
                 </Link>
               );
             })}
+
+            <div className="mt-4 mb-1 px-3">
+              <p className="text-[10px] font-semibold text-[#4a3d37] uppercase tracking-widest">Settings</p>
+            </div>
+            {NAV_SETTINGS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#a89e96] hover:text-white hover:bg-[#2a2320] transition-colors mb-0.5 group"
+              >
+                <span className="text-[#6b5e56] group-hover:text-[#c9a96e] transition-colors">
+                  {item.icon}
+                </span>
+                <span className="text-sm font-medium">{item.label}</span>
+              </Link>
+            ))}
           </nav>
 
           <div className="px-6 py-5 border-t border-[#2a2320] space-y-3">

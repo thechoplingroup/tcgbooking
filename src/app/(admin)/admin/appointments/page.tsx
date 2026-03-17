@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AppointmentStatus } from "@/lib/supabase/types";
 import { useToast } from "@/components/Toast";
 
 interface AppointmentRow {
   id: string;
   start_at: string;
   end_at: string;
-  status: AppointmentStatus;
+  status: string;
   created_at: string;
   client_notes?: string | null;
+  reschedule_preferred_time?: string | null;
+  reschedule_note?: string | null;
   client: { id: string; full_name: string | null } | null;
   service: { id: string; name: string; duration_minutes: number; internal_price_cents?: number } | null;
 }
@@ -42,10 +43,11 @@ function groupByDate(appointments: AppointmentRow[]): Record<string, Appointment
   return groups;
 }
 
-const STATUS_CONFIG: Record<AppointmentStatus, { label: string; bg: string; text: string; dot: string }> = {
+const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
   pending: { label: "Pending", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-400" },
   confirmed: { label: "Confirmed", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-400" },
   cancelled: { label: "Cancelled", bg: "bg-gray-100", text: "text-gray-500", dot: "bg-gray-300" },
+  reschedule_requested: { label: "Reschedule Req.", bg: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-400" },
 };
 
 function Skeleton() {
@@ -97,7 +99,7 @@ export default function AppointmentsPage() {
     setLoading(false);
   }
 
-  async function updateStatus(id: string, status: AppointmentStatus) {
+  async function updateStatus(id: string, status: string) {
     const prev = appointments.find((a) => a.id === id);
 
     // Optimistic update
@@ -135,7 +137,7 @@ export default function AppointmentsPage() {
     }
   }
 
-  const pending = appointments.filter((a) => a.status === "pending");
+  const pending = appointments.filter((a) => a.status === "pending" || a.status === "reschedule_requested");
   const grouped = groupByDate(appointments);
 
   return (
@@ -199,7 +201,7 @@ export default function AppointmentsPage() {
               <div className="bg-white rounded-2xl border border-[#e8e2dc] overflow-hidden divide-y divide-[#f5f0eb]">
                 {dayAppts.map((appt) => {
                   const status = STATUS_CONFIG[appt.status];
-                  const isPending = appt.status === "pending";
+                  const isPending = appt.status === "pending" || appt.status === "reschedule_requested";
                   const isExpanded = expanded === appt.id;
 
                   return (
@@ -247,6 +249,15 @@ export default function AppointmentsPage() {
                       {isExpanded && (
                         <div className="px-4 sm:px-5 pb-4 sm:pb-5 border-t border-[#f5f0eb] bg-[#faf9f7]">
                           <div className="pt-4 space-y-2 mb-4">
+                            {appt.status === "reschedule_requested" && appt.reschedule_preferred_time && (
+                              <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
+                                <p className="text-xs font-semibold text-purple-700 mb-1">Reschedule Request</p>
+                                <p className="text-sm text-purple-800">
+                                  Wants to move to: <strong>{appt.reschedule_preferred_time}</strong>
+                                  {appt.reschedule_note && <span className="block mt-1 italic">{appt.reschedule_note}</span>}
+                                </p>
+                              </div>
+                            )}
                             {appt.client_notes && (
                               <div className="bg-[#fffbeb] border border-[#fcd34d] rounded-xl px-4 py-3">
                                 <p className="text-xs font-semibold text-amber-700 mb-1">Client Note</p>
@@ -274,7 +285,7 @@ export default function AppointmentsPage() {
 
                           {appt.status !== "cancelled" && (
                             <div className="flex items-center gap-2">
-                              {isPending && (
+                              {appt.status === "pending" && (
                                 <button
                                   onClick={() => updateStatus(appt.id, "confirmed")}
                                   className="flex items-center gap-1.5 px-4 py-2.5 bg-[#9b6f6f] text-white text-sm font-semibold rounded-full hover:bg-[#8a5f5f] active:scale-95 transition-all min-h-[44px]"
@@ -283,6 +294,17 @@ export default function AppointmentsPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                   </svg>
                                   Confirm
+                                </button>
+                              )}
+                              {appt.status === "reschedule_requested" && (
+                                <button
+                                  onClick={() => updateStatus(appt.id, "confirmed")}
+                                  className="flex items-center gap-1.5 px-4 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-full hover:bg-purple-700 active:scale-95 transition-all min-h-[44px]"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  Mark Rescheduled
                                 </button>
                               )}
                               <button

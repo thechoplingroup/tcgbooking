@@ -60,6 +60,7 @@ export async function POST(request: Request) {
     open_time?: string | null;
     close_time?: string | null;
     is_closed?: boolean;
+    note?: string | null;
   };
 
   const { label, effective_from, effective_until, day_of_week, open_time, close_time, is_closed } = body;
@@ -78,20 +79,53 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "open_time and close_time are required unless is_closed is true" }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from("operational_hours_overrides")
-    .insert({
-      stylist_id: stylistId,
-      label: label ?? null,
-      effective_from,
-      effective_until,
-      day_of_week: day_of_week ?? null,
-      open_time: closed ? null : (open_time ?? null),
-      close_time: closed ? null : (close_time ?? null),
-      is_closed: closed,
-    })
-    .select()
-    .single();
+  // For single-day overrides (from=until, day_of_week=null), upsert to prevent duplicates
+  const isSingleDay = effective_from === effective_until && (day_of_week === null || day_of_week === undefined);
+
+  let data, error;
+
+  if (isSingleDay) {
+    // Delete any existing override for this exact single day, then insert fresh
+    await supabase
+      .from("operational_hours_overrides")
+      .delete()
+      .eq("stylist_id", stylistId)
+      .eq("effective_from", effective_from)
+      .eq("effective_until", effective_until)
+      .is("day_of_week", null);
+
+    ({ data, error } = await supabase
+      .from("operational_hours_overrides")
+      .insert({
+        stylist_id: stylistId,
+        label: label ?? null,
+        effective_from,
+        effective_until,
+        day_of_week: null,
+        open_time: closed ? null : (open_time ?? null),
+        close_time: closed ? null : (close_time ?? null),
+        is_closed: closed,
+        ...(body.note !== undefined ? { note: body.note ?? null } : {}),
+      })
+      .select()
+      .single());
+  } else {
+    ({ data, error } = await supabase
+      .from("operational_hours_overrides")
+      .insert({
+        stylist_id: stylistId,
+        label: label ?? null,
+        effective_from,
+        effective_until,
+        day_of_week: day_of_week ?? null,
+        open_time: closed ? null : (open_time ?? null),
+        close_time: closed ? null : (close_time ?? null),
+        is_closed: closed,
+        ...(body.note !== undefined ? { note: body.note ?? null } : {}),
+      })
+      .select()
+      .single());
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

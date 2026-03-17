@@ -35,6 +35,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; d
   pending: { label: "Awaiting Approval", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-400" },
   confirmed: { label: "Confirmed", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
   cancelled: { label: "Cancelled", bg: "bg-gray-100", text: "text-gray-500", dot: "bg-gray-300" },
+  reschedule_requested: { label: "Reschedule Requested", bg: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-400" },
 };
 
 function Skeleton() {
@@ -54,10 +55,116 @@ function Skeleton() {
   );
 }
 
+// ─── Reschedule sheet ────────────────────────────────────────────────────────
+
+function RescheduleSheet({
+  appt,
+  onClose,
+  onSubmitted,
+}: {
+  appt: AppointmentWithDetails;
+  onClose: () => void;
+  onSubmitted: (id: string) => void;
+}) {
+  const [preferredTime, setPreferredTime] = useState("");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    if (!preferredTime.trim()) { setError("Please enter your preferred time."); return; }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/appointments/${appt.id}/reschedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferred_time: preferredTime.trim(), note: note.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Something went wrong."); return; }
+      onSubmitted(appt.id);
+    } catch { setError("Network error. Please try again."); }
+    finally { setSubmitting(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full sm:max-w-sm bg-white sm:rounded-3xl rounded-t-3xl shadow-2xl p-5">
+        <div className="flex justify-center mb-4 sm:hidden">
+          <div className="w-10 h-1 bg-[#e8e2dc] rounded-full" />
+        </div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-display text-lg text-[#1a1714]">Request Reschedule</h3>
+            <p className="text-xs text-[#8a7e78] mt-0.5">{appt.service?.name}</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-[#8a7e78] hover:text-[#1a1714]">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <p className="text-sm text-[#5c4a42] mb-4 leading-relaxed">
+          Let Keri know when works best for you — she&apos;ll reach out to find a new time.
+        </p>
+
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-[#5c4a42] mb-1.5">
+            Preferred date/time <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={preferredTime}
+            onChange={(e) => setPreferredTime(e.target.value)}
+            placeholder='e.g. "Any Tuesday afternoon" or "Week of April 14"'
+            className="w-full border border-[#e8e2dc] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
+            style={{ fontSize: 16 }}
+          />
+        </div>
+        <div className="mb-5">
+          <label className="block text-xs font-medium text-[#5c4a42] mb-1.5">
+            Additional note <span className="font-normal text-[#8a7e78]">(optional)</span>
+          </label>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Anything else Keri should know…"
+            rows={2}
+            className="w-full border border-[#e8e2dc] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] resize-none"
+            style={{ fontSize: 16 }}
+          />
+        </div>
+
+        {error && <p className="text-sm text-red-600 mb-3 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="w-full py-3 bg-[#9b6f6f] text-white font-semibold rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-all text-sm min-h-[48px]"
+        >
+          {submitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Sending…
+            </span>
+          ) : "Send Reschedule Request"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ─────────────────────────────────────────────────────────────────
+
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rescheduleAppt, setRescheduleAppt] = useState<AppointmentWithDetails | null>(null);
+  const [rescheduledIds, setRescheduledIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/appointments")
@@ -71,7 +178,7 @@ export default function AppointmentsPage() {
   }, []);
 
   const now = new Date().toISOString();
-  const upcoming = appointments.filter((a) => a.status !== "cancelled" && a.start_at >= now);
+  const upcoming = appointments.filter((a) => !["cancelled"].includes(a.status) && a.start_at >= now);
   const past = appointments.filter((a) => a.status === "confirmed" && a.start_at < now);
   const cancelled = appointments.filter((a) => a.status === "cancelled");
 
@@ -161,12 +268,19 @@ export default function AppointmentsPage() {
                             &ldquo;{appt.client_notes}&rdquo;
                           </p>
                         )}
-                        <div className="mt-3">
-                          <a
-                            href="mailto:kerichoplin@gmail.com"
-                            className="text-xs text-[#9b6f6f] hover:underline"
-                          >
-                            Questions? Contact Keri →
+                        <div className="mt-3 flex items-center gap-3">
+                          {(appt.status === "pending" || appt.status === "confirmed") && !rescheduledIds.has(appt.id) ? (
+                            <button
+                              onClick={() => setRescheduleAppt(appt)}
+                              className="text-xs text-[#8a7e78] hover:text-[#9b6f6f] font-medium border border-[#e8e2dc] px-3 py-1.5 rounded-full hover:border-[#9b6f6f] transition-all"
+                            >
+                              Request Reschedule
+                            </button>
+                          ) : appt.status === "reschedule_requested" || rescheduledIds.has(appt.id) ? (
+                            <span className="text-xs text-purple-600 font-medium">Reschedule requested — Keri will reach out</span>
+                          ) : null}
+                          <a href="mailto:kerichoplin@gmail.com" className="text-xs text-[#9b6f6f] hover:underline">
+                            Contact Keri →
                           </a>
                         </div>
                       </div>
@@ -211,6 +325,21 @@ export default function AppointmentsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Reschedule sheet */}
+      {rescheduleAppt && (
+        <RescheduleSheet
+          appt={rescheduleAppt}
+          onClose={() => setRescheduleAppt(null)}
+          onSubmitted={(id) => {
+            setRescheduledIds((prev) => { const s = new Set(prev); s.add(id); return s; });
+            setAppointments((prev) =>
+              prev.map((a) => a.id === id ? { ...a, status: "reschedule_requested" } : a)
+            );
+            setRescheduleAppt(null);
+          }}
+        />
       )}
     </div>
   );

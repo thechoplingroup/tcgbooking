@@ -153,6 +153,100 @@ export async function sendBookingConfirmation(data: BookingConfirmationData): Pr
   ]);
 }
 
+// ─── Rebooking Reminder ───────────────────────────────────────────────────────
+
+interface RebookingReminderData {
+  clientEmail: string;
+  clientName: string | null;
+  stylistId: string;
+  serviceName: string;
+  serviceId: string;
+  message: string; // Keri's custom message
+  suggestedDate: string | null; // YYYY-MM-DD
+  bookingBaseUrl: string;
+}
+
+export async function sendRebookingReminder(data: RebookingReminderData): Promise<void> {
+  const { clientEmail, clientName, stylistId, serviceName, serviceId, message, suggestedDate, bookingBaseUrl } = data;
+  const displayName = clientName ?? "there";
+  const bookUrl = `${bookingBaseUrl}/book/${stylistId}?serviceId=${serviceId}`;
+
+  const suggestedLine = suggestedDate
+    ? `<p style="font-size:13px;color:#8a7e78;font-family:sans-serif;text-align:center;margin:0 0 20px">
+        Suggested around <strong style="color:#9b6f6f">${new Date(suggestedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</strong>
+       </p>`
+    : "";
+
+  const html = `
+    <div style="${baseStyle}">
+      <div style="text-align:center;margin-bottom:24px">
+        ${monogram()}
+        <h2 style="margin:0;font-size:22px;color:#1a1714;font-family:Georgia,serif">Time for your next visit ✨</h2>
+        <p style="margin:8px 0 0;font-size:14px;color:#8a7e78;font-family:sans-serif">Hi ${displayName}!</p>
+      </div>
+      <div style="${cardStyle}">
+        <p style="font-size:15px;color:#1a1714;font-family:Georgia,serif;line-height:1.6;margin:0;white-space:pre-line">${message}</p>
+      </div>
+      ${suggestedLine}
+      <div style="text-align:center;margin-bottom:20px">
+        <a href="${bookUrl}" style="display:inline-block;background:#9b6f6f;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:50px;font-family:sans-serif;font-size:15px;font-weight:600;letter-spacing:0.3px">
+          Book Now →
+        </a>
+      </div>
+      <p style="text-align:center;font-size:12px;color:#8a7e78;font-family:sans-serif;margin:0">
+        Questions? <a href="mailto:kerichoplin@gmail.com" style="color:#9b6f6f">Reply to Keri</a>
+      </p>
+      <p style="text-align:center;margin-top:20px;font-size:12px;color:#8a7e78;font-family:sans-serif">Keri Choplin Hair Studio · Lafayette, Louisiana</p>
+    </div>`;
+
+  await sendEmail(clientEmail, `Keri thinks it's time for your next ${serviceName} 💇‍♀️`, html);
+}
+
+// ─── Reschedule Request ───────────────────────────────────────────────────────
+
+interface RescheduleRequestData {
+  stylistEmail: string;
+  clientName: string | null;
+  clientEmail: string;
+  serviceName: string;
+  appointmentDate: string; // ISO
+  preferredTime: string; // free text from client
+  adminUrl: string;
+}
+
+export async function sendRescheduleRequest(data: RescheduleRequestData): Promise<void> {
+  const { stylistEmail, clientName, clientEmail, serviceName, appointmentDate, preferredTime, adminUrl } = data;
+  const displayName = clientName ?? clientEmail;
+  const dateStr = formatDateTime(appointmentDate);
+
+  const html = `
+    <div style="${baseStyle}">
+      <div style="text-align:center;margin-bottom:24px">
+        ${monogram()}
+        <h2 style="margin:0;font-size:22px;color:#1a1714;font-family:Georgia,serif">Reschedule Request</h2>
+        <p style="margin:8px 0 0;font-size:14px;color:#8a7e78;font-family:sans-serif">${displayName} wants to reschedule</p>
+      </div>
+      <div style="${cardStyle}">
+        <table style="${rowStyle}">
+          <tr><td style="${tdLabelStyle}">Client</td><td style="${tdValueStyle}">${displayName}</td></tr>
+          <tr><td style="${tdLabelStyle}">Email</td><td style="${tdValueStyle}">${clientEmail}</td></tr>
+          <tr><td style="${tdLabelStyle}">Service</td><td style="${tdValueStyle}">${serviceName}</td></tr>
+          <tr><td style="${tdLabelStyle}">Current date</td><td style="${tdValueStyle}">${dateStr}</td></tr>
+          <tr><td style="${tdLabelLastStyle}">Requested time</td><td style="${tdValueLastStyle}">${preferredTime}</td></tr>
+        </table>
+      </div>
+      <div style="text-align:center;margin-bottom:16px">
+        <a href="${adminUrl}" style="display:inline-block;background:#9b6f6f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:50px;font-family:sans-serif;font-size:14px;font-weight:600">
+          View in Dashboard →
+        </a>
+      </div>
+      <p style="text-align:center;font-size:13px;color:#8a7e78;font-family:sans-serif">Reply to this email or reach out to ${displayName} directly to find a new time.</p>
+      <p style="text-align:center;margin-top:20px;font-size:12px;color:#8a7e78;font-family:sans-serif">Keri Choplin Hair Studio · Lafayette, Louisiana</p>
+    </div>`;
+
+  await sendEmail(stylistEmail, `${displayName} wants to reschedule their ${serviceName}`, html);
+}
+
 export async function sendStatusUpdateEmail(data: StatusUpdateData): Promise<void> {
   const { clientEmail, clientName, stylistName, serviceName, startAt, status, bookingUrl } = data;
   const dateTime = formatDateTime(startAt);
