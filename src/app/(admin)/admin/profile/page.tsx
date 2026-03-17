@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Stylist } from "@/lib/supabase/types";
 import { useToast } from "@/components/Toast";
+import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 
 const MAX_BIO = 300;
 
@@ -13,12 +14,21 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [cancellationPolicy, setCancellationPolicy] = useState("");
   const [bookingUrl, setBookingUrl] = useState("");
+  const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Get admin email for password change
+    import("@/lib/supabase/client").then(({ createClient }) => {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user?.email) setAdminEmail(user.email);
+      });
+    });
+
     fetch("/api/admin/profile")
       .then((r) => r.json())
       .then(({ stylist }) => {
@@ -219,6 +229,11 @@ export default function ProfilePage() {
           ) : stylist ? "Update Profile" : "Create Profile"}
         </button>
       </form>
+
+      {/* Change password */}
+      <div className="mt-6">
+        <ChangePasswordForm email={adminEmail} />
+      </div>
     </div>
   );
 }

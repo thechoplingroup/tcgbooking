@@ -23,20 +23,30 @@ export async function GET() {
 
   const stylistId = await getStylistId(supabase, user.id);
   if (!stylistId) {
-    return NextResponse.json({ hours: [] });
+    return NextResponse.json({ hours: [], overrides: [] });
   }
 
-  const { data, error } = await supabase
-    .from("operational_hours")
-    .select("*")
-    .eq("stylist_id", stylistId)
-    .order("day_of_week");
+  const [hoursResult, overridesResult] = await Promise.all([
+    supabase
+      .from("operational_hours")
+      .select("*")
+      .eq("stylist_id", stylistId)
+      .order("day_of_week"),
+    supabase
+      .from("operational_hours_overrides")
+      .select("*")
+      .eq("stylist_id", stylistId)
+      .order("effective_from"),
+  ]);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (hoursResult.error) {
+    return NextResponse.json({ error: hoursResult.error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ hours: data });
+  return NextResponse.json({
+    hours: hoursResult.data,
+    overrides: overridesResult.data ?? [],
+  });
 }
 
 export async function POST(request: Request) {

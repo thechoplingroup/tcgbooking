@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 
 type Step = "idle" | "confirm-delete" | "deleting" | "signing-out";
 
@@ -118,25 +119,10 @@ export default function AccountPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </Link>
-
-        <Link
-          href="/reset-password"
-          className="flex items-center justify-between px-5 py-4 hover:bg-[#faf9f7] active:bg-[#f5f0eb] transition-colors min-h-[56px]"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#f5ede8] flex items-center justify-center">
-              <svg className="w-4 h-4 text-[#9b6f6f]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
-            </div>
-            <span className="text-sm font-medium text-[#1a1714]">Change Password</span>
-          </div>
-          <svg className="w-4 h-4 text-[#c9a96e]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
       </div>
+
+      {/* Change password */}
+      <ChangePasswordForm email={email} />
 
       {/* Sign out */}
       <div className="bg-white rounded-2xl border border-[#e8e2dc] overflow-hidden mb-4">
