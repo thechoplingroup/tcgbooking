@@ -46,20 +46,14 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch stylist ID via direct Supabase REST API (edge-compatible)
-    const stylistRes = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/stylists?user_id=eq.${user.id}&select=id&limit=1`,
-      {
-        headers: {
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
-          Accept: "application/json",
-        },
-      }
-    );
+    // Fetch stylist ID using the authenticated session
+    const { data: stylistData } = await supabase
+      .from("stylists")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
 
-    const stylists = await stylistRes.json();
-    const stylistId = stylists?.[0]?.id ?? null;
+    const stylistId = stylistData?.id ?? null;
 
     if (!stylistId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
