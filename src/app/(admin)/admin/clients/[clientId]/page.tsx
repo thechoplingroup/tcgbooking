@@ -147,6 +147,7 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
 
   useEffect(() => {
     fetchClient().finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, clientType]);
 
   // Load services for Log Service modal

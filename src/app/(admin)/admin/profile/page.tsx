@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import type { Stylist } from "@/lib/supabase/types";
 import { useToast } from "@/components/Toast";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";

@@ -86,7 +86,7 @@ export async function GET(request: Request) {
   const walkIns = walkInsResult.data ?? [];
   const walkInIds = walkIns.map((w) => w.id);
 
-  let walkInLogMap = new Map<string, { count: number; lastDate: string }>();
+  const walkInLogMap = new Map<string, { count: number; lastDate: string }>();
   if (walkInIds.length > 0) {
     const { data: logRows } = await serviceClient
       .from("client_service_log")
