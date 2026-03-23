@@ -81,11 +81,11 @@ export async function GET(
 
   // Run all independent queries in parallel
   const [emailResult, appointmentsResult, logEntriesResult, notesResult] = await Promise.all([
-    // Email from auth
+    // Email only from auth (strip full user object)
     serviceClient.auth.admin.getUserById(clientId).then(
       ({ data }) => data?.user?.email ?? null,
       () => null
-    ),
+    ).catch(() => null),
     // Appointment history
     serviceClient
       .from("appointments")
