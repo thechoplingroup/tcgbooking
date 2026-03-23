@@ -116,16 +116,29 @@ function Skeleton() {
   );
 }
 
+interface EditState {
+  id: string;
+  start_at: string;
+  end_at: string;
+  service_id: string;
+  client_notes: string;
+}
+
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"upcoming" | "all" | "cancelled">("upcoming");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [editAppt, setEditAppt] = useState<EditState | null>(null);
+  const [deleteAppt, setDeleteAppt] = useState<AppointmentRow | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [services, setServices] = useState<ServiceInfo[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     loadAppointments();
+    fetch("/api/admin/services").then(r => r.json()).then(d => setServices(d.services ?? []));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
@@ -176,6 +189,66 @@ export default function AppointmentsPage() {
       setErrors((e) => ({ ...e, [id]: "Failed" }));
       setTimeout(() => setErrors((e) => { const n = { ...e }; delete n[id]; return n; }), 4000);
     }
+  }
+
+  async function saveEdit() {
+    if (!editAppt) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/appointments/${editAppt.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          start_at: editAppt.start_at,
+          end_at: editAppt.end_at,
+          service_id: editAppt.service_id || undefined,
+          client_notes: editAppt.client_notes,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const { appointment } = await res.json();
+      setAppointments(list => list.map(a => a.id === editAppt.id ? { ...a, ...appointment } : a));
+      setEditAppt(null);
+      toast("Appointment updated", "success");
+    } catch {
+      toast("Failed to update — please try again.", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteAppointment() {
+    if (!deleteAppt) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/appointments/${deleteAppt.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+      setAppointments(list => list.filter(a => a.id !== deleteAppt.id));
+      setDeleteAppt(null);
+      if (expanded === deleteAppt.id) setExpanded(null);
+      toast("Appointment deleted", "info");
+    } catch {
+      toast("Failed to delete — please try again.", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openEdit(appt: AppointmentRow) {
+    const svc = getAllServices(appt)[0];
+    // Convert UTC ISO to local datetime-local format
+    const toLocalDT = (iso: string) => {
+      const d = new Date(iso);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    setEditAppt({
+      id: appt.id,
+      start_at: toLocalDT(appt.start_at),
+      end_at: toLocalDT(appt.end_at),
+      service_id: svc?.id ?? "",
+      client_notes: appt.client_notes ?? "",
+    });
   }
 
   const pending = appointments.filter((a) => a.status === "pending" || a.status === "reschedule_requested");
@@ -324,41 +397,62 @@ export default function AppointmentsPage() {
                             <p className="text-xs text-red-600 mb-3">{errors[appt.id]}</p>
                           )}
 
-                          {appt.status !== "cancelled" && (
-                            <div className="flex items-center gap-2">
-                              {appt.status === "pending" && (
-                                <button
-                                  onClick={() => updateStatus(appt.id, "confirmed")}
-                                  className="flex items-center gap-1.5 px-4 py-2.5 bg-[#9b6f6f] text-white text-sm font-semibold rounded-full hover:bg-[#8a5f5f] active:scale-95 transition-all min-h-[44px]"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                  Confirm
-                                </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                              {appt.status !== "cancelled" && (
+                                <>
+                                  {appt.status === "pending" && (
+                                    <button
+                                      onClick={() => updateStatus(appt.id, "confirmed")}
+                                      className="flex items-center gap-1.5 px-4 py-2.5 bg-[#9b6f6f] text-white text-sm font-semibold rounded-full hover:bg-[#8a5f5f] active:scale-95 transition-all min-h-[44px]"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                      Confirm
+                                    </button>
+                                  )}
+                                  {appt.status === "reschedule_requested" && (
+                                    <button
+                                      onClick={() => updateStatus(appt.id, "confirmed")}
+                                      className="flex items-center gap-1.5 px-4 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-full hover:bg-purple-700 active:scale-95 transition-all min-h-[44px]"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                      Mark Rescheduled
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => updateStatus(appt.id, "cancelled")}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 border border-[#e8e2dc] text-[#8a7e78] text-sm font-semibold rounded-full hover:border-red-200 hover:text-red-600 hover:bg-red-50 active:scale-95 transition-all min-h-[44px]"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    {appt.status === "confirmed" ? "Cancel" : "Decline"}
+                                  </button>
+                                </>
                               )}
-                              {appt.status === "reschedule_requested" && (
-                                <button
-                                  onClick={() => updateStatus(appt.id, "confirmed")}
-                                  className="flex items-center gap-1.5 px-4 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-full hover:bg-purple-700 active:scale-95 transition-all min-h-[44px]"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  Mark Rescheduled
-                                </button>
-                              )}
+                              {/* Edit + Delete always available */}
                               <button
-                                onClick={() => updateStatus(appt.id, "cancelled")}
+                                onClick={() => openEdit(appt)}
+                                className="flex items-center gap-1.5 px-4 py-2.5 border border-[#e8e2dc] text-[#8a7e78] text-sm font-semibold rounded-full hover:border-[#c9a96e] hover:text-[#c9a96e] hover:bg-[#fdf8f0] active:scale-95 transition-all min-h-[44px]"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => setDeleteAppt(appt)}
                                 className="flex items-center gap-1.5 px-4 py-2.5 border border-[#e8e2dc] text-[#8a7e78] text-sm font-semibold rounded-full hover:border-red-200 hover:text-red-600 hover:bg-red-50 active:scale-95 transition-all min-h-[44px]"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                {appt.status === "confirmed" ? "Cancel" : "Decline"}
+                                Delete
                               </button>
                             </div>
-                          )}
                         </div>
                       )}
                     </div>
@@ -367,6 +461,119 @@ export default function AppointmentsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editAppt && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setEditAppt(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <h2 className="font-display text-xl text-[#1a1714]">Edit Appointment</h2>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Service</label>
+                <select
+                  value={editAppt.service_id}
+                  onChange={e => setEditAppt(s => s ? { ...s, service_id: e.target.value } : s)}
+                  className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
+                  style={{ fontSize: 16 }}
+                >
+                  <option value="">— No service —</option>
+                  {services.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Start</label>
+                  <input
+                    type="datetime-local"
+                    value={editAppt.start_at}
+                    onChange={e => setEditAppt(s => s ? { ...s, start_at: e.target.value } : s)}
+                    className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
+                    style={{ fontSize: 16 }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">End</label>
+                  <input
+                    type="datetime-local"
+                    value={editAppt.end_at}
+                    onChange={e => setEditAppt(s => s ? { ...s, end_at: e.target.value } : s)}
+                    className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
+                    style={{ fontSize: 16 }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Client Notes</label>
+                <textarea
+                  value={editAppt.client_notes}
+                  onChange={e => setEditAppt(s => s ? { ...s, client_notes: e.target.value } : s)}
+                  rows={3}
+                  placeholder="Any notes about this appointment…"
+                  className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] resize-none"
+                  style={{ fontSize: 16 }}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setEditAppt(null)}
+                className="flex-1 py-3 border border-[#e8e2dc] rounded-xl text-sm font-semibold text-[#8a7e78] hover:bg-[#f5f0eb] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={saving}
+                className="flex-1 py-3 bg-[#9b6f6f] text-white rounded-xl text-sm font-semibold hover:bg-[#8a5f5f] disabled:opacity-50 transition-colors"
+              >
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {deleteAppt && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setDeleteAppt(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto">
+              <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <h2 className="font-display text-lg text-[#1a1714]">Delete Appointment?</h2>
+              <p className="text-sm text-[#8a7e78] mt-1">
+                {deleteAppt.client?.full_name ?? "Guest"} · {serviceNames(deleteAppt)}<br />
+                {new Date(deleteAppt.start_at).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} at {formatTime(deleteAppt.start_at)}
+              </p>
+              <p className="text-xs text-red-600 mt-2">This cannot be undone.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteAppt(null)}
+                className="flex-1 py-3 border border-[#e8e2dc] rounded-xl text-sm font-semibold text-[#8a7e78] hover:bg-[#f5f0eb] transition-colors"
+              >
+                Keep It
+              </button>
+              <button
+                onClick={deleteAppointment}
+                disabled={saving}
+                className="flex-1 py-3 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 disabled:opacity-50 transition-colors"
+              >
+                {saving ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
