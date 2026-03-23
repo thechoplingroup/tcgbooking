@@ -2,17 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import ClientsPageClient from "./ClientsPageClient";
+import type { ClientRow } from "@/types/clients";
 
 const PAGE_LIMIT = 20;
-
-interface ClientRow {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  totalAppointments: number;
-  lastAppointment: string;
-  clientType: "auth" | "walkin";
-}
 
 export default async function ClientsPage() {
   const supabase = await createClient();

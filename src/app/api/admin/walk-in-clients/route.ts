@@ -1,14 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getStylistId } from "@/lib/auth-helpers";
+import { z } from "zod";
 
-async function getStylistId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase
-    .from("stylists")
-    .select("id")
-    .eq("user_id", userId)
-    .single();
-  return data?.id ?? null;
+// Validation schema for walk-in client creation
+const WalkInClientSchema = z.object({
+  full_name: z.string().min(1, "Name is required").max(100, "Name too long"),
+  phone: z.string().max(30, "Phone too long").optional().nullable(),
+  email: z.string().email("Invalid email").max(255, "Email too long").optional().nullable().or(z.literal("")),
+  notes: z.string().max(5000, "Notes too long").optional().nullable(),
+});
+
+// Sanitize search input to prevent SQL injection in ilike patterns
+function sanitizeSearch(input: string): string {
+  return input.replace(/[%_\\]/g, "\\$&");
 }
 
 export async function GET(request: Request) {
@@ -31,7 +37,8 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false });
 
   if (search) {
-    query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+    const sanitized = sanitizeSearch(search);
+    query = query.or(`full_name.ilike.%${sanitized}%,email.ilike.%${sanitized}%,phone.ilike.%${sanitized}%`);
   }
 
   const { data, error } = await query;
@@ -52,15 +59,22 @@ export async function POST(request: Request) {
   const stylistId = await getStylistId(supabase, user.id);
   if (!stylistId) return NextResponse.json({ error: "Create your profile first." }, { status: 400 });
 
-  let body: { full_name?: string; phone?: string; email?: string; notes?: string };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const fullName = body.full_name?.trim();
-  if (!fullName) return NextResponse.json({ error: "full_name is required" }, { status: 400 });
+  const parsed = WalkInClientSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.issues.map((e) => ({ path: e.path.join("."), message: e.message })) },
+      { status: 400 }
+    );
+  }
+
+  const { full_name, phone, email, notes } = parsed.data;
 
   const serviceClient = createServiceClient();
 
@@ -68,10 +82,10 @@ export async function POST(request: Request) {
     .from("walk_in_clients")
     .insert({
       stylist_id: stylistId,
-      full_name: fullName,
-      phone: body.phone?.trim() || null,
-      email: body.email?.trim() || null,
-      notes: body.notes?.trim() || null,
+      full_name: full_name.trim(),
+      phone: phone?.trim() || null,
+      email: email?.trim() || null,
+      notes: notes?.trim() || null,
     })
     .select()
     .single();

@@ -1,15 +1,23 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getStylistId } from "@/lib/auth-helpers";
+import { z } from "zod";
 
-async function getStylistId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase
-    .from("stylists")
-    .select("id")
-    .eq("user_id", userId)
-    .single();
-  return data?.id ?? null;
-}
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Validation schema for service log entry
+const ServiceLogSchema = z.object({
+  client_id: z.string().regex(uuidRegex, "Invalid client_id UUID").optional().nullable(),
+  walk_in_client_id: z.string().regex(uuidRegex, "Invalid walk_in_client_id UUID").optional().nullable(),
+  service_id: z.string().regex(uuidRegex, "Invalid service_id UUID").optional().nullable(),
+  service_name: z.string().min(1, "Service name is required").max(200, "Service name too long"),
+  price_cents: z.number().int().min(0).max(9999999).optional().default(0),
+  visit_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)").optional(),
+  notes: z.string().max(5000, "Notes too long").optional().nullable(),
+}).refine((d) => d.client_id || d.walk_in_client_id, {
+  message: "client_id or walk_in_client_id is required",
+});
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -54,27 +62,22 @@ export async function POST(request: Request) {
   const stylistId = await getStylistId(supabase, user.id);
   if (!stylistId) return NextResponse.json({ error: "Create your profile first." }, { status: 400 });
 
-  let body: {
-    client_id?: string;
-    walk_in_client_id?: string;
-    service_id?: string;
-    service_name?: string;
-    price_cents?: number;
-    visit_date?: string;
-    notes?: string;
-  };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const serviceName = body.service_name?.trim();
-  if (!serviceName) return NextResponse.json({ error: "service_name is required" }, { status: 400 });
-
-  if (!body.client_id && !body.walk_in_client_id) {
-    return NextResponse.json({ error: "client_id or walk_in_client_id is required" }, { status: 400 });
+  const parsed = ServiceLogSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.issues.map((e) => ({ path: e.path.join("."), message: e.message })) },
+      { status: 400 }
+    );
   }
+
+  const { client_id, walk_in_client_id, service_id, service_name, price_cents, visit_date, notes } = parsed.data;
 
   const serviceClient = createServiceClient();
 
@@ -82,13 +85,13 @@ export async function POST(request: Request) {
     .from("client_service_log")
     .insert({
       stylist_id: stylistId,
-      client_id: body.client_id || null,
-      walk_in_client_id: body.walk_in_client_id || null,
-      service_id: body.service_id || null,
-      service_name: serviceName,
-      price_cents: body.price_cents ?? 0,
-      visit_date: body.visit_date || new Date().toISOString().slice(0, 10),
-      notes: body.notes?.trim() || null,
+      client_id: client_id || null,
+      walk_in_client_id: walk_in_client_id || null,
+      service_id: service_id || null,
+      service_name: service_name.trim(),
+      price_cents: price_cents ?? 0,
+      visit_date: visit_date || new Date().toISOString().slice(0, 10),
+      notes: notes?.trim() || null,
     })
     .select()
     .single();

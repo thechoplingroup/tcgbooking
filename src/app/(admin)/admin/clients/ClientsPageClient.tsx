@@ -3,15 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
-
-interface ClientRow {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  totalAppointments: number;
-  lastAppointment: string;
-  clientType?: "auth" | "walkin";
-}
+import type { ClientRow } from "@/types/clients";
 
 interface ClientsPageClientProps {
   initialClients: ClientRow[];

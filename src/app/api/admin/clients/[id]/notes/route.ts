@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { z } from "zod";
+
+// Validation schema for notes
+const NotesSchema = z.object({
+  notes: z.string().max(10000, "Notes cannot exceed 10,000 characters").nullable(),
+});
 
 export async function PATCH(
   request: Request,
@@ -14,7 +20,22 @@ export async function PATCH(
     .from("stylists").select("id").eq("user_id", user.id).single();
   if (!stylist) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { notes } = await request.json() as { notes: string };
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = NotesSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.issues.map((e) => ({ path: e.path.join("."), message: e.message })) },
+      { status: 400 }
+    );
+  }
+
+  const { notes } = parsed.data;
 
   const serviceClient = createServiceClient();
 

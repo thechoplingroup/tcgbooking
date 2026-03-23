@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getStylistId } from "@/lib/auth-helpers";
 
 // ─── Zod validation ──────────────────────────────────────────────────────────
 
@@ -9,15 +10,6 @@ const PostServiceSchema = z.object({
   duration_minutes: z.number().int().min(1, "duration_minutes min 1").max(480, "duration_minutes max 480"),
   internal_price_cents: z.number().int().min(0, "internal_price_cents min 0").max(999999, "internal_price_cents max 999999").optional().default(0),
 });
-
-async function getStylistId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase
-    .from("stylists")
-    .select("id")
-    .eq("user_id", userId)
-    .single();
-  return data?.id ?? null;
-}
 
 export async function GET() {
   const supabase = await createClient();
