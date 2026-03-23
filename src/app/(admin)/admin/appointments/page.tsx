@@ -136,9 +136,14 @@ export default function AppointmentsPage() {
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const { toast } = useToast();
 
+  // Load services once on mount
+  useEffect(() => {
+    fetch("/api/admin/services").then(r => r.json()).then(d => setServices(d.services ?? []));
+  }, []);
+
+  // Load appointments when filter changes
   useEffect(() => {
     loadAppointments();
-    fetch("/api/admin/services").then(r => r.json()).then(d => setServices(d.services ?? []));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
