@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/service";
 
 async function sendEmailViaResend(to: string, subject: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -39,11 +39,7 @@ export async function POST(
 
   if (!message) return NextResponse.json({ error: "message is required" }, { status: 400 });
 
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const serviceClient = createServiceClient();
 
   // Get client info
   let clientEmail: string | null = null;

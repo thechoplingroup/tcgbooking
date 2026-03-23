@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/service";
 
 async function getStylistId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data } = await supabase
@@ -27,11 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "clientId and clientType are required" }, { status: 400 });
   }
 
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const serviceClient = createServiceClient();
 
   const col = clientType === "walkin" ? "walk_in_client_id" : "client_id";
 
@@ -80,11 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "client_id or walk_in_client_id is required" }, { status: 400 });
   }
 
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const serviceClient = createServiceClient();
 
   const { data, error } = await serviceClient
     .from("client_service_log")

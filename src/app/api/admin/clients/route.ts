@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -16,12 +16,7 @@ export async function GET(request: Request) {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
 
-  // Use service role to read auth user emails
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const serviceClient = createServiceClient();
 
   // Get all distinct clients who have booked with this stylist
   const { data: apptRows, error } = await serviceClient
@@ -60,32 +55,26 @@ export async function GET(request: Request) {
 
   const clientIds = clientMap.size > 0 ? Array.from(clientMap.keys()) : [];
 
-  // Get profile data for auth clients
-  let profiles: { id: string; full_name: string | null }[] = [];
-  if (clientIds.length > 0) {
-    const { data } = await serviceClient
-      .from("profiles")
-      .select("id, full_name")
-      .in("id", clientIds);
-    profiles = data ?? [];
-  }
+  // Get profile data and walk-in clients in parallel
+  const [profilesResult, walkInsResult] = await Promise.all([
+    clientIds.length > 0
+      ? serviceClient.from("profiles").select("id, full_name").in("id", clientIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
+    serviceClient
+      .from("walk_in_clients")
+      .select("id, full_name, phone, email, created_at")
+      .eq("stylist_id", stylist.id),
+  ]);
 
-  // Get emails from auth.users via admin API
-  const emailMap = new Map<string, string>();
-  try {
-    const { data: usersData } = await serviceClient.auth.admin.listUsers({ perPage: 1000 });
-    for (const u of usersData?.users ?? []) {
-      if (u.email) emailMap.set(u.id, u.email);
-    }
-  } catch { /* emails optional */ }
+  const profiles = profilesResult.data ?? [];
 
-  // Build auth client list
+  // Build auth client list (without emails for now)
   const authClients = profiles.map((p) => {
     const stats = clientMap.get(p.id);
     return {
       id: p.id,
       full_name: p.full_name,
-      email: emailMap.get(p.id) ?? null,
+      email: null as string | null,
       totalAppointments: stats?.totalAppointments ?? 0,
       lastAppointment: stats?.lastAppointment ?? "",
       firstAppointment: stats?.firstAppointment ?? "",
@@ -94,13 +83,9 @@ export async function GET(request: Request) {
   });
 
   // ── Walk-in clients ──────────────────────────────────────────────────
-  const { data: walkIns } = await serviceClient
-    .from("walk_in_clients")
-    .select("id, full_name, phone, email, created_at")
-    .eq("stylist_id", stylist.id);
+  const walkIns = walkInsResult.data ?? [];
+  const walkInIds = walkIns.map((w) => w.id);
 
-  // Get service log counts for walk-in clients
-  const walkInIds = (walkIns ?? []).map((w) => w.id);
   let walkInLogMap = new Map<string, { count: number; lastDate: string }>();
   if (walkInIds.length > 0) {
     const { data: logRows } = await serviceClient
@@ -120,7 +105,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const walkInClients = (walkIns ?? []).map((w) => {
+  const walkInClients = walkIns.map((w) => {
     const stats = walkInLogMap.get(w.id);
     return {
       id: w.id,
@@ -149,6 +134,28 @@ export async function GET(request: Request) {
   const offset = (page - 1) * limit;
   clients = clients.slice(offset, offset + limit);
   const hasMore = offset + clients.length < total;
+
+  // Fetch emails only for the paginated auth clients (instead of all users)
+  const authClientIds = clients
+    .filter((c) => c.clientType === "auth")
+    .map((c) => c.id);
+
+  if (authClientIds.length > 0) {
+    const emailResults = await Promise.all(
+      authClientIds.map((id) =>
+        serviceClient.auth.admin.getUserById(id).then(
+          ({ data }) => ({ id, email: data?.user?.email ?? null }),
+          () => ({ id, email: null })
+        )
+      )
+    );
+    const emailMap = new Map(emailResults.map((r) => [r.id, r.email]));
+    for (const c of clients) {
+      if (c.clientType === "auth") {
+        c.email = emailMap.get(c.id) ?? null;
+      }
+    }
+  }
 
   return NextResponse.json({ clients, total, hasMore, page, limit });
 }

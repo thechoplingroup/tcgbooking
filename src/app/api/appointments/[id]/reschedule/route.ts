@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/service";
 import { sendRescheduleRequest } from "@/lib/email";
 
 export async function POST(
@@ -32,11 +32,7 @@ export async function POST(
     return NextResponse.json({ error: "preferred_time is required" }, { status: 400 });
   }
 
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const serviceClient = createServiceClient();
 
   // Update appointment status — use TEXT field
   // First try with reschedule columns, fall back if they don't exist

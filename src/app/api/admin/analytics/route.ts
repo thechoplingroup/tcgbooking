@@ -25,19 +25,35 @@ export async function GET() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-
-  // 6 months ago for trend
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
 
-  // Fetch all appointments for this month (with details)
-  const { data: monthAppts } = await supabase
-    .from("appointments")
-    .select("*, service:services!service_id(id, name, duration_minutes, internal_price_cents)")
-    .eq("stylist_id", stylist.id)
-    .gte("start_at", monthStart)
-    .lte("start_at", monthEnd);
+  // Run all independent queries in parallel
+  const [monthApptsResult, recentApptsResult, recentTenResult] = await Promise.all([
+    // This month's appointments with service details
+    supabase
+      .from("appointments")
+      .select("*, service:services!service_id(id, name, duration_minutes, internal_price_cents)")
+      .eq("stylist_id", stylist.id)
+      .gte("start_at", monthStart)
+      .lte("start_at", monthEnd),
+    // Last 6 months for trends + top services (merged two queries into one)
+    supabase
+      .from("appointments")
+      .select("start_at, status, service:services!service_id(id, name)")
+      .eq("stylist_id", stylist.id)
+      .gte("start_at", sixMonthsAgo)
+      .in("status", ["confirmed", "pending"]),
+    // Recent 10 appointments
+    supabase
+      .from("appointments")
+      .select("*, client:profiles!client_id(id, full_name), service:services!service_id(id, name)")
+      .eq("stylist_id", stylist.id)
+      .order("start_at", { ascending: false })
+      .limit(10),
+  ]);
 
-  const appointments = monthAppts ?? [];
+  const appointments = monthApptsResult.data ?? [];
+  const allRecent = recentApptsResult.data ?? [];
 
   // Total appointments this month
   const totalThisMonth = appointments.length;
@@ -59,7 +75,6 @@ export async function GET() {
   const clientIds = Array.from(new Set(appointments.filter((a) => a.client_id).map((a) => a.client_id)));
   let newClients = 0;
   if (clientIds.length > 0) {
-    // For each client, check if they have any appointment before this month
     const { data: priorAppts } = await supabase
       .from("appointments")
       .select("client_id")
@@ -72,33 +87,16 @@ export async function GET() {
     newClients = clientIds.filter((id) => !priorClientIds.has(id)).length;
   }
 
-  // Busiest days of week (all time recent 6 months)
-  const { data: recentAppts } = await supabase
-    .from("appointments")
-    .select("start_at, status, service_id")
-    .eq("stylist_id", stylist.id)
-    .gte("start_at", sixMonthsAgo)
-    .in("status", ["confirmed", "pending"]);
-
-  const allRecent = recentAppts ?? [];
-
   // Day of week counts
-  const dayOfWeekCounts: number[] = [0, 0, 0, 0, 0, 0, 0]; // Sun-Sat
+  const dayOfWeekCounts: number[] = [0, 0, 0, 0, 0, 0, 0];
   allRecent.forEach((a) => {
     const dow = new Date(a.start_at).getDay();
     dayOfWeekCounts[dow]++;
   });
 
-  // Top 5 services
-  const { data: sixMonthAppts } = await supabase
-    .from("appointments")
-    .select("service:services!service_id(id, name)")
-    .eq("stylist_id", stylist.id)
-    .gte("start_at", sixMonthsAgo)
-    .in("status", ["confirmed", "pending"]);
-
+  // Top 5 services (from the same recentAppts query — no separate fetch needed)
   const serviceCounts: Record<string, { name: string; count: number }> = {};
-  (sixMonthAppts ?? []).forEach((a: { service?: { id: string; name: string } | { id: string; name: string }[] | null }) => {
+  allRecent.forEach((a: { service?: { id: string; name: string } | { id: string; name: string }[] | null }) => {
     const svc = Array.isArray(a.service) ? a.service[0] : a.service;
     const name = svc?.name;
     if (name) {
@@ -121,14 +119,6 @@ export async function GET() {
     monthlyTrend.push({ month: label, count });
   }
 
-  // Recent 10 appointments
-  const { data: recentTen } = await supabase
-    .from("appointments")
-    .select("*, client:profiles!client_id(id, full_name), service:services!service_id(id, name)")
-    .eq("stylist_id", stylist.id)
-    .order("start_at", { ascending: false })
-    .limit(10);
-
   return NextResponse.json({
     totalThisMonth,
     revenueCents,
@@ -137,6 +127,6 @@ export async function GET() {
     dayOfWeekCounts,
     topServices,
     monthlyTrend,
-    recentAppointments: recentTen ?? [],
+    recentAppointments: recentTenResult.data ?? [],
   });
 }

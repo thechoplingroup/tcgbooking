@@ -1,13 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 function getServiceClient() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  return createServiceClient();
 }
 
 async function getAuth() {
@@ -83,44 +79,43 @@ export async function GET(
 
   if (!profile) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
-  // Email from auth
-  let email: string | null = null;
-  try {
-    const { data: userData } = await serviceClient.auth.admin.getUserById(clientId);
-    email = userData?.user?.email ?? null;
-  } catch { /* optional */ }
-
-  // Appointment history
-  const { data: appointments } = await serviceClient
-    .from("appointments")
-    .select(`
-      id, start_at, end_at, status, client_notes, created_at,
-      reschedule_note, reschedule_preferred_time,
-      final_price_cents, discount_cents, discount_note,
-      service:services!service_id(id, name, duration_minutes)
-    `)
-    .eq("stylist_id", auth.stylistId)
-    .eq("client_id", clientId)
-    .order("start_at", { ascending: false });
-
-  // Service log entries for auth clients too
-  const { data: logEntries } = await serviceClient
-    .from("client_service_log")
-    .select("*")
-    .eq("stylist_id", auth.stylistId)
-    .eq("client_id", clientId)
-    .order("visit_date", { ascending: false });
-
-  // Private notes
-  const { data: notesRow } = await serviceClient
-    .from("stylist_client_notes")
-    .select("notes, updated_at")
-    .eq("stylist_id", auth.stylistId)
-    .eq("client_id", clientId)
-    .maybeSingle();
+  // Run all independent queries in parallel
+  const [emailResult, appointmentsResult, logEntriesResult, notesResult] = await Promise.all([
+    // Email from auth
+    serviceClient.auth.admin.getUserById(clientId).then(
+      ({ data }) => data?.user?.email ?? null,
+      () => null
+    ),
+    // Appointment history
+    serviceClient
+      .from("appointments")
+      .select(`
+        id, start_at, end_at, status, client_notes, created_at,
+        reschedule_note, reschedule_preferred_time,
+        final_price_cents, discount_cents, discount_note,
+        service:services!service_id(id, name, duration_minutes)
+      `)
+      .eq("stylist_id", auth.stylistId)
+      .eq("client_id", clientId)
+      .order("start_at", { ascending: false }),
+    // Service log entries
+    serviceClient
+      .from("client_service_log")
+      .select("*")
+      .eq("stylist_id", auth.stylistId)
+      .eq("client_id", clientId)
+      .order("visit_date", { ascending: false }),
+    // Private notes
+    serviceClient
+      .from("stylist_client_notes")
+      .select("notes, updated_at")
+      .eq("stylist_id", auth.stylistId)
+      .eq("client_id", clientId)
+      .maybeSingle(),
+  ]);
 
   // Stats
-  const appts = appointments ?? [];
+  const appts = appointmentsResult.data ?? [];
   const confirmed = appts.filter((a) => a.status === "confirmed" || a.status === "reschedule_requested");
   const firstBooking = appts.length > 0 ? appts[appts.length - 1]?.created_at : null;
 
@@ -128,7 +123,7 @@ export async function GET(
     client: {
       id: profile.id,
       full_name: profile.full_name,
-      email,
+      email: emailResult,
       created_at: profile.created_at,
       clientType: "auth",
     },
@@ -138,9 +133,9 @@ export async function GET(
       firstBooking,
     },
     appointments: appts,
-    serviceLog: logEntries ?? [],
-    notes: notesRow?.notes ?? null,
-    notesUpdatedAt: notesRow?.updated_at ?? null,
+    serviceLog: logEntriesResult.data ?? [],
+    notes: notesResult.data?.notes ?? null,
+    notesUpdatedAt: notesResult.data?.updated_at ?? null,
   });
 }
 

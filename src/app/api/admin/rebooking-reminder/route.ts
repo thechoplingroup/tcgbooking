@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/service";
 import { sendRebookingReminder } from "@/lib/email";
 
 export async function POST(request: Request) {
@@ -26,11 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const serviceClient = createServiceClient();
 
   // Get client email
   let clientEmail: string | null = null;

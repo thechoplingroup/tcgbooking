@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export async function PATCH(
   request: Request,
@@ -16,11 +16,7 @@ export async function PATCH(
 
   const { notes } = await request.json() as { notes: string };
 
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const serviceClient = createServiceClient();
 
   // Upsert — one notes row per stylist+client
   const { data, error } = await serviceClient

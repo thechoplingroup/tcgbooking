@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/service";
 
 async function getStylistId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data } = await supabase
@@ -19,11 +19,7 @@ export async function GET(request: Request) {
   const stylistId = await getStylistId(supabase, user.id);
   if (!stylistId) return NextResponse.json({ clients: [] });
 
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const serviceClient = createServiceClient();
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("q")?.toLowerCase() ?? "";
@@ -66,11 +62,7 @@ export async function POST(request: Request) {
   const fullName = body.full_name?.trim();
   if (!fullName) return NextResponse.json({ error: "full_name is required" }, { status: 400 });
 
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const serviceClient = createServiceClient();
 
   const { data, error } = await serviceClient
     .from("walk_in_clients")
