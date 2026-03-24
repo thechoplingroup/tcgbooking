@@ -109,7 +109,7 @@ function DayRow({ dayIndex, hour, onSaved, onClosed }: DayRowProps) {
               value={openTime}
               onChange={(e) => { setOpenTime(e.target.value); scheduleSave(e.target.value, closeTime); }}
               onBlur={() => save(openTime, closeTime)}
-              className="border border-[#e8e2dc] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7] w-[110px]"
+              className="border border-[#e8e2dc] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7] w-[130px]"
               style={{ fontSize: 16 }}
             />
           </div>
@@ -121,7 +121,7 @@ function DayRow({ dayIndex, hour, onSaved, onClosed }: DayRowProps) {
               value={closeTime}
               onChange={(e) => { setCloseTime(e.target.value); scheduleSave(openTime, e.target.value); }}
               onBlur={() => save(openTime, closeTime)}
-              className="border border-[#e8e2dc] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7] w-[110px]"
+              className="border border-[#e8e2dc] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7] w-[130px]"
               style={{ fontSize: 16 }}
             />
           </div>
