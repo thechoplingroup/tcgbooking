@@ -7,6 +7,7 @@ import { ToastProvider } from "@/components/Toast";
 import ClientAuthGuard from "@/components/ClientAuthGuard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import PendingBanner from "@/components/PendingBanner";
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 
 function PageSkeleton() {
   return (
