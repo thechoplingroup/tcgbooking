@@ -657,6 +657,14 @@ interface ClientOption {
   type: "auth" | "walkin";
 }
 
+interface SelectedService {
+  id: string;
+  name: string;
+  duration_minutes: number;
+  price_cents: number; // editable override
+  isCustom?: boolean;
+}
+
 function CreateAppointmentModal({
   services,
   onClose,
@@ -669,7 +677,17 @@ function CreateAppointmentModal({
   const [clientSearch, setClientSearch] = useState("");
   const [clientResults, setClientResults] = useState<ClientOption[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(null);
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [creatingClient, setCreatingClient] = useState(false);
+
+  const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
+  const [showCustomService, setShowCustomService] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customDuration, setCustomDuration] = useState("60");
+  const [customPrice, setCustomPrice] = useState("");
+
   const [date, setDate] = useState(() => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -683,7 +701,7 @@ function CreateAppointmentModal({
 
   const isPast = new Date(`${date}T${time}`) < new Date();
 
-  // Search clients when typing
+  // Search clients
   useEffect(() => {
     if (clientSearch.length < 2) { setClientResults([]); return; }
     const controller = new AbortController();
@@ -691,29 +709,70 @@ function CreateAppointmentModal({
       try {
         const res = await fetch(`/api/admin/clients?q=${encodeURIComponent(clientSearch)}&limit=10`, { signal: controller.signal });
         const data = await res.json();
-        const results: ClientOption[] = (data.clients ?? []).map((c: { id: string; full_name: string | null; clientType: string }) => ({
-          id: c.id,
-          full_name: c.full_name,
+        setClientResults((data.clients ?? []).map((c: { id: string; full_name: string | null; clientType: string }) => ({
+          id: c.id, full_name: c.full_name,
           type: c.clientType === "walkin" ? "walkin" as const : "auth" as const,
-        }));
-        setClientResults(results);
-      } catch {
-        // aborted or error
-      }
+        })));
+      } catch { /* aborted */ }
     }, 300);
     return () => { controller.abort(); clearTimeout(timer); };
   }, [clientSearch]);
 
-  // Compute end time from selected services
-  const totalDur = selectedServiceIds.reduce((sum, sid) => {
-    const svc = services.find((s) => s.id === sid);
-    return sum + (svc?.duration_minutes ?? 0);
-  }, 0);
+  async function createNewClient() {
+    if (!newClientName.trim()) return;
+    setCreatingClient(true);
+    try {
+      const res = await fetch("/api/admin/walk-in-clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: newClientName.trim(), phone: newClientPhone.trim() || null }),
+      });
+      const data = await res.json();
+      if (res.ok && data.client) {
+        setSelectedClient({ id: data.client.id, full_name: data.client.full_name, type: "walkin" });
+        setShowNewClient(false);
+        setNewClientName("");
+        setNewClientPhone("");
+        setClientSearch("");
+      }
+    } finally { setCreatingClient(false); }
+  }
 
-  const totalPrice = selectedServiceIds.reduce((sum, sid) => {
-    const svc = services.find((s) => s.id === sid);
-    return sum + (svc?.internal_price_cents ?? 0);
-  }, 0);
+  // Toggle service selection with price override
+  function toggleService(svc: ServiceInfo) {
+    setSelectedServices((prev) => {
+      const exists = prev.find((s) => s.id === svc.id);
+      if (exists) return prev.filter((s) => s.id !== svc.id);
+      return [...prev, { id: svc.id, name: svc.name, duration_minutes: svc.duration_minutes, price_cents: svc.internal_price_cents ?? 0 }];
+    });
+  }
+
+  function updateServicePrice(id: string, cents: number) {
+    setSelectedServices((prev) => prev.map((s) => s.id === id ? { ...s, price_cents: cents } : s));
+  }
+
+  function removeService(id: string) {
+    setSelectedServices((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  function addCustomService() {
+    if (!customName.trim()) return;
+    const id = `custom_${Date.now()}`;
+    setSelectedServices((prev) => [...prev, {
+      id, name: customName.trim(),
+      duration_minutes: parseInt(customDuration) || 60,
+      price_cents: Math.round(parseFloat(customPrice || "0") * 100),
+      isCustom: true,
+    }]);
+    setCustomName("");
+    setCustomDuration("60");
+    setCustomPrice("");
+    setShowCustomService(false);
+  }
+
+  const totalDur = selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);
+  const totalPrice = selectedServices.reduce((sum, s) => sum + s.price_cents, 0);
+  const hasRealService = selectedServices.some((s) => !s.isCustom);
 
   function computeEndIso(): string {
     const start = new Date(`${date}T${time}:00`);
@@ -722,12 +781,23 @@ function CreateAppointmentModal({
   }
 
   async function handleSubmit() {
-    if (selectedServiceIds.length === 0) { setError("Select at least one service"); return; }
+    if (selectedServices.length === 0) { setError("Select at least one service"); return; }
     setSaving(true);
     setError("");
 
     const startIso = new Date(`${date}T${time}:00`).toISOString();
     const endIso = computeEndIso();
+
+    // Only send real service IDs (not custom ones)
+    const realServiceIds = selectedServices.filter((s) => !s.isCustom).map((s) => s.id);
+    // If no real services, use the first service from the catalog as a placeholder
+    const serviceIds = realServiceIds.length > 0 ? realServiceIds : [services[0]?.id].filter(Boolean);
+
+    if (serviceIds.length === 0) { setError("No services available"); setSaving(false); return; }
+
+    // Custom service names for notes
+    const customNames = selectedServices.filter((s) => s.isCustom).map((s) => s.name);
+    const allNotes = [notes.trim(), customNames.length > 0 ? `Custom: ${customNames.join(", ")}` : ""].filter(Boolean).join(" | ");
 
     try {
       const res = await fetch("/api/admin/appointments", {
@@ -736,32 +806,25 @@ function CreateAppointmentModal({
         body: JSON.stringify({
           client_id: selectedClient?.type === "auth" ? selectedClient.id : null,
           walk_in_client_id: selectedClient?.type === "walkin" ? selectedClient.id : null,
-          service_ids: selectedServiceIds,
+          service_ids: serviceIds,
           start_at: startIso,
           end_at: endIso,
           status,
-          client_notes: notes.trim() || undefined,
+          client_notes: allNotes || undefined,
+          final_price_cents: totalPrice,
         }),
       });
-
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "Failed to create appointment");
         setSaving(false);
         return;
       }
-
       onCreated();
     } catch {
       setError("Something went wrong");
       setSaving(false);
     }
-  }
-
-  function toggleService(id: string) {
-    setSelectedServiceIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
-    );
   }
 
   const statusOptions = isPast
@@ -770,13 +833,10 @@ function CreateAppointmentModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 space-y-4"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
         <h2 className="font-display text-xl text-[#1a1714]">Add Appointment</h2>
 
-        {/* Client Search */}
+        {/* Client */}
         <div>
           <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Client</label>
           {selectedClient ? (
@@ -789,55 +849,122 @@ function CreateAppointmentModal({
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
+          ) : showNewClient ? (
+            <div className="mt-1 space-y-2 border border-[#e8e2dc] rounded-xl p-3 bg-[#faf9f7]">
+              <input type="text" value={newClientName} onChange={(e) => setNewClientName(e.target.value)}
+                placeholder="Client name" className="w-full border border-[#e8e2dc] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]" style={{ fontSize: 16 }} />
+              <input type="tel" value={newClientPhone} onChange={(e) => setNewClientPhone(e.target.value)}
+                placeholder="Phone (optional)" className="w-full border border-[#e8e2dc] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]" style={{ fontSize: 16 }} />
+              <div className="flex gap-2">
+                <button onClick={() => setShowNewClient(false)} className="flex-1 py-2 border border-[#e8e2dc] rounded-lg text-xs font-semibold text-[#8a7e78]">Cancel</button>
+                <button onClick={createNewClient} disabled={creatingClient || !newClientName.trim()}
+                  className="flex-1 py-2 bg-[#9b6f6f] text-white rounded-lg text-xs font-semibold disabled:opacity-50">
+                  {creatingClient ? "Adding…" : "Add Client"}
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="relative mt-1">
-              <input
-                type="text"
-                value={clientSearch}
-                onChange={(e) => setClientSearch(e.target.value)}
+              <input type="text" value={clientSearch} onChange={(e) => setClientSearch(e.target.value)}
                 placeholder="Search by name or email…"
-                className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
-                style={{ fontSize: 16 }}
-              />
-              {clientResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e8e2dc] rounded-xl shadow-lg z-10 max-h-40 overflow-y-auto">
+                className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]" style={{ fontSize: 16 }} />
+              {(clientResults.length > 0 || clientSearch.length >= 2) && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#e8e2dc] rounded-xl shadow-lg z-10 max-h-48 overflow-y-auto">
                   {clientResults.map((c) => (
-                    <button
-                      key={`${c.type}-${c.id}`}
+                    <button key={`${c.type}-${c.id}`}
                       onClick={() => { setSelectedClient(c); setClientSearch(""); setClientResults([]); }}
-                      className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#f5f0eb] flex items-center justify-between"
-                    >
+                      className="w-full text-left px-3 py-2.5 text-sm hover:bg-[#f5f0eb] flex items-center justify-between">
                       <span>{c.full_name || "Guest"}</span>
                       <span className="text-[10px] text-[#8a7e78]">{c.type === "walkin" ? "Walk-in" : "Client"}</span>
                     </button>
                   ))}
+                  <button onClick={() => { setShowNewClient(true); setNewClientName(clientSearch); setClientResults([]); }}
+                    className="w-full text-left px-3 py-2.5 text-sm text-[#9b6f6f] font-semibold hover:bg-[#f5f0eb] border-t border-[#f5f0eb] flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    New client &ldquo;{clientSearch}&rdquo;
+                  </button>
                 </div>
               )}
             </div>
           )}
-          <p className="text-[10px] text-[#8a7e78] mt-1">Optional — leave blank for unassigned</p>
         </div>
 
-        {/* Services multi-select */}
+        {/* Services */}
         <div>
           <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Services</label>
-          <div className="mt-1 space-y-1 max-h-40 overflow-y-auto border border-[#e8e2dc] rounded-xl p-2">
-            {services.filter((s) => s.duration_minutes > 0).map((s) => (
-              <button
-                key={s.id}
-                onClick={() => toggleService(s.id)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-colors ${
-                  selectedServiceIds.includes(s.id) ? "bg-[#9b6f6f]/10 text-[#9b6f6f] font-semibold" : "hover:bg-[#f5f0eb] text-[#1a1714]"
-                }`}
-              >
-                <span>{s.name}</span>
-                <span className="text-xs text-[#8a7e78]">{s.duration_minutes}m{s.internal_price_cents ? ` · $${(s.internal_price_cents / 100).toFixed(0)}` : ""}</span>
-              </button>
-            ))}
+          {/* Service list to pick from */}
+          <div className="mt-1 space-y-1 max-h-32 overflow-y-auto border border-[#e8e2dc] rounded-xl p-2">
+            {services.filter((s) => s.duration_minutes > 0).map((s) => {
+              const isSelected = selectedServices.some((ss) => ss.id === s.id);
+              return (
+                <button key={s.id} onClick={() => toggleService(s)}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                    isSelected ? "bg-[#9b6f6f]/10 text-[#9b6f6f] font-semibold" : "hover:bg-[#f5f0eb] text-[#1a1714]"
+                  }`}>
+                  <span>{s.name}</span>
+                  <span className="text-xs text-[#8a7e78]">{s.duration_minutes}m · ${((s.internal_price_cents ?? 0) / 100).toFixed(0)}</span>
+                </button>
+              );
+            })}
           </div>
-          {totalDur > 0 && (
+
+          {/* Selected services with editable prices */}
+          {selectedServices.length > 0 && (
+            <div className="mt-2 space-y-1.5">
+              {selectedServices.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 bg-[#f5f0eb] rounded-lg px-3 py-1.5">
+                  <span className="text-xs text-[#1a1714] flex-1 truncate">{s.name}</span>
+                  <span className="text-[10px] text-[#8a7e78]">{s.duration_minutes}m</span>
+                  <div className="relative w-20">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8a7e78]">$</span>
+                    <input type="number" value={(s.price_cents / 100).toFixed(0)}
+                      onChange={(e) => updateServicePrice(s.id, Math.round(parseFloat(e.target.value || "0") * 100))}
+                      className="w-full pl-5 pr-1 py-1 text-xs text-right border border-[#e8e2dc] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#9b6f6f] bg-white"
+                      style={{ fontSize: 14 }} />
+                  </div>
+                  <button onClick={() => removeService(s.id)} className="text-[#8a7e78] hover:text-red-500 p-0.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add custom service */}
+          {showCustomService ? (
+            <div className="mt-2 border border-[#e8e2dc] rounded-xl p-3 bg-[#faf9f7] space-y-2">
+              <input type="text" value={customName} onChange={(e) => setCustomName(e.target.value)}
+                placeholder="Service name" className="w-full border border-[#e8e2dc] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]" style={{ fontSize: 16 }} />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="relative">
+                  <input type="number" value={customDuration} onChange={(e) => setCustomDuration(e.target.value)}
+                    className="w-full border border-[#e8e2dc] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]" style={{ fontSize: 16 }} />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#8a7e78]">min</span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8a7e78]">$</span>
+                  <input type="number" value={customPrice} onChange={(e) => setCustomPrice(e.target.value)}
+                    placeholder="0" step="0.01"
+                    className="w-full border border-[#e8e2dc] rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]" style={{ fontSize: 16 }} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setShowCustomService(false)} className="flex-1 py-2 border border-[#e8e2dc] rounded-lg text-xs font-semibold text-[#8a7e78]">Cancel</button>
+                <button onClick={addCustomService} disabled={!customName.trim()}
+                  className="flex-1 py-2 bg-[#c9a96e] text-white rounded-lg text-xs font-semibold disabled:opacity-50">Add</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setShowCustomService(true)}
+              className="mt-2 text-xs text-[#9b6f6f] font-semibold hover:underline flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add custom service
+            </button>
+          )}
+
+          {selectedServices.length > 0 && (
             <p className="text-xs text-[#8a7e78] mt-1">
-              Total: {totalDur}m{totalPrice > 0 ? ` · $${(totalPrice / 100).toFixed(0)}` : ""}
+              Total: {totalDur}m · ${(totalPrice / 100).toFixed(0)}
             </p>
           )}
         </div>
@@ -846,23 +973,13 @@ function CreateAppointmentModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
-              style={{ fontSize: 16 }}
-            />
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+              className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]" style={{ fontSize: 16 }} />
           </div>
           <div>
             <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Start Time</label>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
-              style={{ fontSize: 16 }}
-            />
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
+              className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]" style={{ fontSize: 16 }} />
           </div>
         </div>
         {isPast && <p className="text-xs text-amber-600 -mt-2">This date is in the past — creating for record-keeping</p>}
@@ -872,15 +989,12 @@ function CreateAppointmentModal({
           <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Status</label>
           <div className="flex gap-2 mt-1">
             {statusOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setStatus(opt.value as typeof status)}
+              <button key={opt.value} onClick={() => setStatus(opt.value as typeof status)}
                 className={`flex-1 text-sm py-2 rounded-xl font-medium transition-colors ${
                   status === opt.value
                     ? opt.value === "no_show" ? "bg-red-500 text-white" : opt.value === "cancelled" ? "bg-gray-500 text-white" : "bg-[#9b6f6f] text-white"
                     : "border border-[#e8e2dc] text-[#8a7e78] hover:bg-[#f5f0eb]"
-                }`}
-              >
+                }`}>
                 {opt.label}
               </button>
             ))}
@@ -890,30 +1004,16 @@ function CreateAppointmentModal({
         {/* Notes */}
         <div>
           <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Notes</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            placeholder="Optional notes…"
-            className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] resize-none"
-            style={{ fontSize: 16 }}
-          />
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Optional notes…"
+            className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] resize-none" style={{ fontSize: 16 }} />
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 border border-[#e8e2dc] rounded-xl text-sm font-semibold text-[#8a7e78] hover:bg-[#f5f0eb] transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving || selectedServiceIds.length === 0}
-            className="flex-1 py-3 bg-[#9b6f6f] text-white rounded-xl text-sm font-semibold hover:bg-[#8a5f5f] disabled:opacity-50 transition-colors"
-          >
+          <button onClick={onClose} className="flex-1 py-3 border border-[#e8e2dc] rounded-xl text-sm font-semibold text-[#8a7e78] hover:bg-[#f5f0eb] transition-colors">Cancel</button>
+          <button onClick={handleSubmit} disabled={saving || selectedServices.length === 0}
+            className="flex-1 py-3 bg-[#9b6f6f] text-white rounded-xl text-sm font-semibold hover:bg-[#8a5f5f] disabled:opacity-50 transition-colors">
             {saving ? "Creating…" : "Add Appointment"}
           </button>
         </div>
