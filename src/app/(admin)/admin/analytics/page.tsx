@@ -32,8 +32,8 @@ export default async function AnalyticsPage() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
 
-  // Run all independent queries in parallel
-  const [monthApptsResult, recentApptsResult, recentTenResult] = await Promise.all([
+  // Run all independent queries in parallel (appointments + service logs)
+  const [monthApptsResult, recentApptsResult, recentTenResult, monthLogsResult, allLogsResult] = await Promise.all([
     // This month's appointments with service details
     serviceClient
       .from("appointments")
@@ -55,21 +55,38 @@ export default async function AnalyticsPage() {
       .eq("stylist_id", stylistId)
       .order("start_at", { ascending: false })
       .limit(10),
+    // This month's service logs
+    serviceClient
+      .from("client_service_log")
+      .select("*")
+      .eq("stylist_id", stylistId)
+      .gte("visit_date", monthStart.slice(0, 10))
+      .lte("visit_date", monthEnd.slice(0, 10)),
+    // Last 6 months of service logs for trends
+    serviceClient
+      .from("client_service_log")
+      .select("visit_date, service_name, price_cents")
+      .eq("stylist_id", stylistId)
+      .gte("visit_date", sixMonthsAgo.slice(0, 10)),
   ]);
 
   const appointments = monthApptsResult.data ?? [];
   const allRecent = recentApptsResult.data ?? [];
+  const monthLogs = monthLogsResult.data ?? [];
+  const allLogs = allLogsResult.data ?? [];
 
-  // Total appointments this month
-  const totalThisMonth = appointments.length;
+  // Total this month: appointments + service logs
+  const totalThisMonth = appointments.length + monthLogs.length;
 
-  // Revenue: sum of service prices for confirmed appointments
+  // Revenue: confirmed appointment service prices + service log prices
   const confirmedAppts = appointments.filter((a) => a.status === "confirmed");
-  const revenueCents = confirmedAppts.reduce((sum: number, a: { service?: { internal_price_cents: number } | { internal_price_cents: number }[] | null }) => {
+  const apptRevenueCents = confirmedAppts.reduce((sum: number, a: { service?: { internal_price_cents: number } | { internal_price_cents: number }[] | null }) => {
     const svc = Array.isArray(a.service) ? a.service[0] : a.service;
     const price = svc?.internal_price_cents ?? 0;
     return sum + price;
   }, 0);
+  const logRevenueCents = monthLogs.reduce((sum: number, l: { price_cents: number }) => sum + (l.price_cents ?? 0), 0);
+  const revenueCents = apptRevenueCents + logRevenueCents;
 
   // Completion rate: confirmed / (total - cancelled)
   const cancelled = appointments.filter((a) => a.status === "cancelled").length;
@@ -92,14 +109,18 @@ export default async function AnalyticsPage() {
     newClients = clientIds.filter((id) => !priorClientIds.has(id)).length;
   }
 
-  // Day of week counts
+  // Day of week counts (appointments + service logs)
   const dayOfWeekCounts: number[] = [0, 0, 0, 0, 0, 0, 0];
   allRecent.forEach((a) => {
     const dow = new Date(a.start_at).getDay();
     dayOfWeekCounts[dow]++;
   });
+  allLogs.forEach((l: { visit_date: string }) => {
+    const dow = new Date(l.visit_date + "T12:00:00").getDay();
+    dayOfWeekCounts[dow]++;
+  });
 
-  // Top 5 services
+  // Top 5 services (appointments + service logs)
   const serviceCounts: Record<string, { name: string; count: number }> = {};
   allRecent.forEach((a: { service?: { id: string; name: string } | { id: string; name: string }[] | null }) => {
     const svc = Array.isArray(a.service) ? a.service[0] : a.service;
@@ -109,29 +130,59 @@ export default async function AnalyticsPage() {
       serviceCounts[name].count++;
     }
   });
+  allLogs.forEach((l: { service_name: string }) => {
+    const name = l.service_name;
+    if (name) {
+      if (!serviceCounts[name]) serviceCounts[name] = { name, count: 0 };
+      serviceCounts[name].count++;
+    }
+  });
   const topServices = Object.values(serviceCounts)
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  // Monthly trend (last 6 months)
+  // Monthly trend (last 6 months — appointments + service logs)
   const monthlyTrend: { month: string; count: number }[] = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const label = d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
     const mStart = d.toISOString();
     const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).toISOString();
-    const count = allRecent.filter((a) => a.start_at >= mStart && a.start_at <= mEnd).length;
-    monthlyTrend.push({ month: label, count });
+    const mStartDate = mStart.slice(0, 10);
+    const mEndDate = mEnd.slice(0, 10);
+    const apptCount = allRecent.filter((a) => a.start_at >= mStart && a.start_at <= mEnd).length;
+    const logCount = allLogs.filter((l: { visit_date: string }) => l.visit_date >= mStartDate && l.visit_date <= mEndDate).length;
+    monthlyTrend.push({ month: label, count: apptCount + logCount });
   }
 
-  // Normalize recentAppointments joins
-  const recentAppointments = (recentTenResult.data ?? []).map((appt) => ({
+  // Combine recent appointments + service logs, sorted by date
+  const recentFromAppts = (recentTenResult.data ?? []).map((appt) => ({
     id: appt.id,
     start_at: appt.start_at,
     status: appt.status,
     client: normalizeFirst(appt.client),
     service: normalizeFirst(appt.service),
   }));
+
+  // Fetch recent service logs with client info
+  const { data: recentLogData } = await serviceClient
+    .from("client_service_log")
+    .select("id, visit_date, service_name, price_cents, client_id, walk_in_client_id")
+    .eq("stylist_id", stylistId)
+    .order("visit_date", { ascending: false })
+    .limit(10);
+
+  const recentFromLogs = (recentLogData ?? []).map((log) => ({
+    id: log.id,
+    start_at: log.visit_date + "T00:00:00Z",
+    status: "logged" as string,
+    client: null as { id: string; full_name: string | null } | null,
+    service: { id: "", name: log.service_name } as { id: string; name: string },
+  }));
+
+  const recentAppointments = [...recentFromAppts, ...recentFromLogs]
+    .sort((a, b) => new Date(b.start_at).getTime() - new Date(a.start_at).getTime())
+    .slice(0, 10);
 
   return (
     <AnalyticsPageClient

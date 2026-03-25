@@ -131,6 +131,11 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
   const [editForm, setEditForm] = useState({ full_name: "", phone: "", email: "", notes: "" });
   const [editSaving, setEditSaving] = useState(false);
 
+  // Edit service log entry
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [logEditForm, setLogEditForm] = useState({ service_name: "", price_cents: 0, visit_date: "", notes: "" });
+  const [logEditSaving, setLogEditSaving] = useState(false);
+
   // Delete client
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -724,45 +729,139 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
             <p className="text-sm font-semibold text-[#1a1714] mb-3">Service Log</p>
             <div className="bg-white rounded-2xl border border-[#e8e2dc] divide-y divide-[#f5f0eb] overflow-hidden">
               {serviceLog.map((entry) => (
-                <div key={entry.id} className="px-5 py-4 group">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#1a1714]">{entry.service_name}</p>
-                      <p className="text-xs text-[#8a7e78] mt-0.5">
-                        {new Date(entry.visit_date + "T12:00:00").toLocaleDateString("en-US", {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          year: new Date(entry.visit_date).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
-                        })}
-                      </p>
-                      {entry.notes && (
-                        <p className="text-xs text-[#8a7e78] mt-1 italic">{entry.notes}</p>
-                      )}
+                <div key={entry.id} className="px-5 py-4">
+                  {editingLogId === entry.id ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={logEditForm.service_name}
+                        onChange={(e) => setLogEditForm((f) => ({ ...f, service_name: e.target.value }))}
+                        className="w-full border border-[#e8e2dc] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
+                        style={{ fontSize: 16 }}
+                        placeholder="Service name"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="date"
+                          value={logEditForm.visit_date}
+                          onChange={(e) => setLogEditForm((f) => ({ ...f, visit_date: e.target.value }))}
+                          className="border border-[#e8e2dc] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
+                          style={{ fontSize: 16 }}
+                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8a7e78]">$</span>
+                          <input
+                            type="number"
+                            value={(logEditForm.price_cents / 100).toFixed(2)}
+                            onChange={(e) => setLogEditForm((f) => ({ ...f, price_cents: Math.round(parseFloat(e.target.value || "0") * 100) }))}
+                            className="w-full border border-[#e8e2dc] rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
+                            style={{ fontSize: 16 }}
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={logEditForm.notes}
+                        onChange={(e) => setLogEditForm((f) => ({ ...f, notes: e.target.value }))}
+                        className="w-full border border-[#e8e2dc] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
+                        style={{ fontSize: 16 }}
+                        placeholder="Notes (optional)"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingLogId(null)}
+                          className="flex-1 py-2 border border-[#e8e2dc] rounded-lg text-xs font-semibold text-[#8a7e78] hover:bg-[#f5f0eb]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          disabled={logEditSaving}
+                          onClick={async () => {
+                            setLogEditSaving(true);
+                            try {
+                              const res = await fetch(`/api/admin/service-log/${entry.id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  service_name: logEditForm.service_name,
+                                  price_cents: logEditForm.price_cents,
+                                  visit_date: logEditForm.visit_date,
+                                  notes: logEditForm.notes || null,
+                                }),
+                              });
+                              if (res.ok) {
+                                const { entry: updated } = await res.json();
+                                setServiceLog((prev) => prev.map((e) => e.id === entry.id ? { ...e, ...updated } : e));
+                                setEditingLogId(null);
+                              }
+                            } finally {
+                              setLogEditSaving(false);
+                            }
+                          }}
+                          className="flex-1 py-2 bg-[#9b6f6f] text-white rounded-lg text-xs font-semibold hover:bg-[#8a5f5f] disabled:opacity-50"
+                        >
+                          {logEditSaving ? "Saving…" : "Save"}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {entry.price_cents > 0 && (
-                        <span className="text-sm font-semibold text-[#1a1714]">
-                          ${(entry.price_cents / 100).toFixed(2)}
-                        </span>
-                      )}
-                      <button
-                        onClick={async () => {
-                          if (!confirm("Delete this service log entry?")) return;
-                          const res = await fetch(`/api/admin/service-log/${entry.id}`, { method: "DELETE" });
-                          if (res.ok) {
-                            setServiceLog((prev) => prev.filter((e) => e.id !== entry.id));
-                          }
-                        }}
-                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1.5 rounded-lg text-[#8a7e78] hover:text-red-500 hover:bg-red-50 transition-all"
-                        title="Delete entry"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                  ) : (
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[#1a1714]">{entry.service_name}</p>
+                        <p className="text-xs text-[#8a7e78] mt-0.5">
+                          {new Date(entry.visit_date + "T12:00:00").toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            year: new Date(entry.visit_date).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
+                          })}
+                        </p>
+                        {entry.notes && (
+                          <p className="text-xs text-[#8a7e78] mt-1 italic">{entry.notes}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {entry.price_cents > 0 && (
+                          <span className="text-sm font-semibold text-[#1a1714] mr-1">
+                            ${(entry.price_cents / 100).toFixed(2)}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => {
+                            setLogEditForm({
+                              service_name: entry.service_name,
+                              price_cents: entry.price_cents,
+                              visit_date: entry.visit_date,
+                              notes: entry.notes ?? "",
+                            });
+                            setEditingLogId(entry.id);
+                          }}
+                          className="p-1.5 rounded-lg text-[#8a7e78] hover:text-[#9b6f6f] hover:bg-[#f5f0eb] transition-all"
+                          title="Edit entry"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm("Delete this service log entry?")) return;
+                            const res = await fetch(`/api/admin/service-log/${entry.id}`, { method: "DELETE" });
+                            if (res.ok) {
+                              setServiceLog((prev) => prev.filter((e) => e.id !== entry.id));
+                            }
+                          }}
+                          className="p-1.5 rounded-lg text-[#8a7e78] hover:text-red-500 hover:bg-red-50 transition-all"
+                          title="Delete entry"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
