@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { STUDIO } from "@/config/studio";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Page title — can't use generateMetadata in client component, set via document
 // Meta description handled in layout
@@ -257,6 +258,7 @@ export default function StylistBookingPage() {
     : null;
 
   return (
+    <ErrorBoundary>
     <div className="max-w-xl mx-auto">
       {/* Header */}
       <div className="text-center mb-8">
@@ -700,5 +702,6 @@ export default function StylistBookingPage() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

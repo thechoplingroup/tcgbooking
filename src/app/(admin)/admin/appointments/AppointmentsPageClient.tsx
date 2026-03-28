@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface ServiceInfo {
   id: string;
@@ -289,6 +290,7 @@ export default function AppointmentsPageClient({
   const grouped = groupByDate(appointments);
 
   return (
+    <ErrorBoundary>
     <div className="max-w-3xl">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
@@ -646,6 +648,7 @@ export default function AppointmentsPageClient({
         />
       )}
     </div>
+    </ErrorBoundary>
   );
 }
 

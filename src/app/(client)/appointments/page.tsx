@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { STUDIO } from "@/config/studio";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface AppointmentWithDetails {
   id: string;
@@ -184,6 +185,7 @@ export default function AppointmentsPage() {
   const cancelled = appointments.filter((a) => a.status === "cancelled");
 
   return (
+    <ErrorBoundary>
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -302,7 +304,17 @@ export default function AppointmentsPage() {
                       <p className="text-sm font-medium text-[#1a1714]">{appt.service?.name}</p>
                       <p className="text-xs text-[#8a7e78]">{formatDateTime(appt.start_at)}</p>
                     </div>
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Completed</span>
+                    <div className="flex items-center gap-2">
+                      {appt.stylist?.id && appt.service?.id && (
+                        <Link
+                          href={`/book/${appt.stylist.id}?serviceId=${appt.service.id}`}
+                          className="text-xs font-medium px-3 py-1 rounded-full bg-[#f5ede8] text-[#9b6f6f] hover:bg-[#e8d8d0] transition-colors"
+                        >
+                          Book Again
+                        </Link>
+                      )}
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Completed</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -343,5 +355,6 @@ export default function AppointmentsPage() {
         />
       )}
     </div>
+    </ErrorBoundary>
   );
 }

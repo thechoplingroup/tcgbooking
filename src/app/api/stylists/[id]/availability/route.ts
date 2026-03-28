@@ -1,20 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-
-// Parse "HH:MM:SS" into total minutes
-function parseTime(timeStr: string): number {
-  const [h, m] = timeStr.split(":").map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-}
-
-function overlaps(
-  aStart: number,
-  aEnd: number,
-  bStart: number,
-  bEnd: number
-): boolean {
-  return aStart < bEnd && aEnd > bStart;
-}
+import {
+  parseTime,
+  generateSlots,
+  filterAvailableSlots,
+  formatSlot,
+} from "@/lib/availability";
 
 export async function GET(
   request: Request,
@@ -134,11 +125,7 @@ export async function GET(
   }
 
   // Generate candidate slots (every 30 min)
-  const slotInterval = 30;
-  const candidates: Array<{ startMin: number; endMin: number }> = [];
-  for (let start = openMin; start + duration <= closeMin; start += slotInterval) {
-    candidates.push({ startMin: start, endMin: start + duration });
-  }
+  const candidates = generateSlots(openMin, closeMin, duration, 30);
 
   if (candidates.length === 0) {
     return NextResponse.json({ slots: [] });
@@ -187,22 +174,12 @@ export async function GET(
   const isToday = dateStr === todayUTC;
   const nowMinutes = isToday ? now.getUTCHours() * 60 + now.getUTCMinutes() : -1;
 
-  const available = candidates.filter(({ startMin, endMin }) => {
-    if (isToday && startMin <= nowMinutes) return false;
-    return !busyRanges.some((r) => overlaps(startMin, endMin, r.start, r.end));
-  });
+  const available = filterAvailableSlots(candidates, busyRanges, isToday, nowMinutes);
 
   // Format as ISO strings for the given date
-  const slots = available.map(({ startMin, endMin }) => {
-    const sh = String(Math.floor(startMin / 60)).padStart(2, "0");
-    const sm = String(startMin % 60).padStart(2, "0");
-    const eh = String(Math.floor(endMin / 60)).padStart(2, "0");
-    const em = String(endMin % 60).padStart(2, "0");
-    return {
-      start_at: `${dateStr}T${sh}:${sm}:00Z`,
-      end_at: `${dateStr}T${eh}:${em}:00Z`,
-    };
-  });
+  const slots = available.map(({ startMin, endMin }) =>
+    formatSlot(dateStr, startMin, endMin)
+  );
 
   return NextResponse.json(
     { slots },

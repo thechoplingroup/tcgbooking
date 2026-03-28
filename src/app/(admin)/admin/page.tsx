@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import PendingRequestsList from "@/components/PendingRequestsList";
 import DashboardQuickActions from "@/components/DashboardQuickActions";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { STUDIO } from "@/config/studio";
 import type { Metadata } from "next";
 
@@ -162,6 +163,7 @@ export default async function AdminDashboardPage() {
   const greeting = getGreeting();
 
   return (
+    <ErrorBoundary>
     <div className="max-w-lg mx-auto">
       {/* Greeting */}
       <div className="mb-6">
@@ -287,5 +289,6 @@ export default async function AdminDashboardPage() {
         )}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
