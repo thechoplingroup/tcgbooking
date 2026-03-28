@@ -247,6 +247,67 @@ export async function sendRescheduleRequest(data: RescheduleRequestData): Promis
   await sendEmail(stylistEmail, `${displayName} wants to reschedule their ${serviceName}`, html);
 }
 
+// ─── Waitlist Notification ────────────────────────────────────────────────────
+
+interface WaitlistNotificationData {
+  clientEmail: string;
+  clientName: string | null;
+  serviceName: string;
+  availableDate: string;
+  availableTime: string;
+  message?: string;
+  bookingUrl: string;
+}
+
+export async function sendWaitlistNotification(data: WaitlistNotificationData): Promise<void> {
+  const { clientEmail, clientName, serviceName, availableDate, availableTime, message, bookingUrl } = data;
+  const displayName = clientName ?? "there";
+
+  const dateFormatted = new Date(availableDate + "T12:00:00").toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const messageBlock = message
+    ? `<div style="${cardStyle};margin-bottom:16px">
+        <p style="font-size:14px;color:#1a1714;font-family:Georgia,serif;line-height:1.6;margin:0;white-space:pre-line">${message}</p>
+       </div>`
+    : "";
+
+  const html = `
+    <div style="${baseStyle}">
+      <div style="text-align:center;margin-bottom:24px">
+        ${monogram()}
+        <h2 style="margin:0;font-size:22px;color:#1a1714;font-family:Georgia,serif">A spot just opened up!</h2>
+        <p style="margin:8px 0 0;font-size:14px;color:#8a7e78;font-family:sans-serif">Hi ${displayName}, great news!</p>
+      </div>
+      ${messageBlock}
+      <div style="${cardStyle}">
+        <table style="${rowStyle}">
+          <tr><td style="${tdLabelStyle}">Service</td><td style="${tdValueStyle}">${serviceName}</td></tr>
+          <tr><td style="${tdLabelStyle}">Available date</td><td style="${tdValueStyle}">${dateFormatted}</td></tr>
+          <tr><td style="${tdLabelLastStyle}">Time</td><td style="${tdValueLastStyle}">${availableTime}</td></tr>
+        </table>
+      </div>
+      <p style="text-align:center;font-size:13px;color:#8a7e78;font-family:sans-serif;margin:0 0 20px">
+        This slot won&rsquo;t last long &mdash; book now to grab it!
+      </p>
+      <div style="text-align:center;margin-bottom:20px">
+        <a href="${bookingUrl}" style="display:inline-block;background:#9b6f6f;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:50px;font-family:sans-serif;font-size:15px;font-weight:600;letter-spacing:0.3px">
+          Book This Slot
+        </a>
+      </div>
+      <p style="text-align:center;font-size:12px;color:#8a7e78;font-family:sans-serif;margin:0">
+        Questions? <a href="mailto:${STUDIO.contactEmail}" style="color:#9b6f6f">Reply to ${STUDIO.ownerName}</a>
+      </p>
+      <p style="text-align:center;margin-top:20px;font-size:12px;color:#8a7e78;font-family:sans-serif">${STUDIO.name} &middot; ${STUDIO.location}</p>
+    </div>`;
+
+  await sendEmail(clientEmail, `A spot opened up for ${serviceName}! — ${STUDIO.shortName}`, html);
+}
+
 export async function sendStatusUpdateEmail(data: StatusUpdateData): Promise<void> {
   const { clientEmail, clientName, stylistName, serviceName, startAt, status, bookingUrl } = data;
   const dateTime = formatDateTime(startAt);

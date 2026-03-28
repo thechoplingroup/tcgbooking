@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import AdminCalendar from "@/components/AdminCalendar";
 
 interface ServiceInfo {
   id: string;
@@ -150,12 +151,25 @@ export default function AppointmentsPageClient({
   const [deleteAppt, setDeleteAppt] = useState<AppointmentRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [services, setServices] = useState<ServiceInfo[]>([]);
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [blockedTimes, setBlockedTimes] = useState<Array<{ id: string; start_at: string; end_at: string; reason?: string }>>([]);
   const { toast } = useToast();
+  const router = useRouter();
+  const [waitlistPrompt, setWaitlistPrompt] = useState<{ count: number; date: string } | null>(null);
 
   // Load services once on mount
   useEffect(() => {
     fetch("/api/admin/services").then(r => r.json()).then(d => setServices(d.services ?? []));
   }, []);
+
+  // Load blocked times when calendar view is active
+  useEffect(() => {
+    if (viewMode !== "calendar") return;
+    fetch("/api/admin/blocked-times")
+      .then((r) => r.json())
+      .then((d) => setBlockedTimes(d.blocked_times ?? []))
+      .catch(() => {});
+  }, [viewMode]);
 
   const loadAppointments = useCallback(async (filterValue: "upcoming" | "all" | "cancelled" | "no_show") => {
     setLoading(true);
@@ -209,6 +223,15 @@ export default function AppointmentsPageClient({
         body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error("Failed");
+
+      // Check for waitlist matches on cancellation
+      if (status === "cancelled") {
+        const json = await res.json();
+        if (json.waitlist_count > 0) {
+          const apptDate = prev?.start_at?.split("T")[0] ?? "";
+          setWaitlistPrompt({ count: json.waitlist_count, date: apptDate });
+        }
+      }
     } catch {
       // Revert
       if (prev) {
@@ -291,7 +314,7 @@ export default function AppointmentsPageClient({
 
   return (
     <ErrorBoundary>
-    <div className="max-w-3xl">
+    <div className={viewMode === "calendar" ? "max-w-6xl" : "max-w-3xl"}>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl text-[#1a1714]">Appointments</h1>
@@ -308,6 +331,58 @@ export default function AppointmentsPageClient({
         </button>
       </div>
 
+      {/* View toggle + Filter tabs row */}
+      <div className="flex items-center gap-3 mb-6">
+        {/* Filter tabs */}
+        <div className="flex gap-1 bg-[#f5f0eb] p-1 rounded-xl overflow-x-auto">
+          {(["upcoming", "all", "cancelled", "no_show"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => handleFilterChange(f)}
+              className={`text-sm px-3 sm:px-4 py-2 rounded-lg transition-colors font-medium min-h-[44px] whitespace-nowrap ${
+                filter === f ? "bg-white text-[#1a1714] shadow-sm" : "text-[#8a7e78] hover:text-[#5c4a42]"
+              }`}
+            >
+              {f === "upcoming" ? "Upcoming" : f === "all" ? "All" : f === "cancelled" ? "Cancelled" : "No Show"}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1" />
+
+        {/* List / Calendar toggle */}
+        <div className="flex bg-[#f5f0eb] p-1 rounded-xl flex-shrink-0">
+          <button
+            onClick={() => setViewMode("list")}
+            className={`p-2 rounded-lg transition-colors ${
+              viewMode === "list"
+                ? "bg-white text-[#9b6f6f] shadow-sm"
+                : "text-[#8a7e78] hover:text-[#5c4a42]"
+            }`}
+            aria-label="List view"
+            title="List view"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setViewMode("calendar")}
+            className={`p-2 rounded-lg transition-colors ${
+              viewMode === "calendar"
+                ? "bg-white text-[#9b6f6f] shadow-sm"
+                : "text-[#8a7e78] hover:text-[#5c4a42]"
+            }`}
+            aria-label="Calendar view"
+            title="Calendar view"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
       {/* Pending banner */}
       {filter === "upcoming" && pending.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 mb-6 flex items-start gap-3">
@@ -321,22 +396,13 @@ export default function AppointmentsPageClient({
         </div>
       )}
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 mb-6 bg-[#f5f0eb] p-1 rounded-xl w-fit overflow-x-auto">
-        {(["upcoming", "all", "cancelled", "no_show"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => handleFilterChange(f)}
-            className={`text-sm px-3 sm:px-4 py-2 rounded-lg transition-colors font-medium min-h-[44px] whitespace-nowrap ${
-              filter === f ? "bg-white text-[#1a1714] shadow-sm" : "text-[#8a7e78] hover:text-[#5c4a42]"
-            }`}
-          >
-            {f === "upcoming" ? "Upcoming" : f === "all" ? "All" : f === "cancelled" ? "Cancelled" : "No Show"}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
+      {viewMode === "calendar" ? (
+        <AdminCalendar
+          appointments={appointments}
+          blockedTimes={blockedTimes}
+          onAppointmentClick={(id) => setExpanded(id)}
+        />
+      ) : loading ? (
         <Skeleton />
       ) : appointments.length === 0 ? (
         <div className="bg-white rounded-2xl border border-[#e8e2dc] text-center py-16">
@@ -646,6 +712,44 @@ export default function AppointmentsPageClient({
             toast("Appointment created", "success");
           }}
         />
+      )}
+
+      {/* Waitlist notification prompt */}
+      {waitlistPrompt && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/30" onClick={() => setWaitlistPrompt(null)}>
+          <div className="bg-white rounded-2xl border border-[#e8e2dc] shadow-xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-4">
+              <div className="w-10 h-10 rounded-full bg-[#f5ede8] flex items-center justify-center mx-auto mb-3">
+                <svg className="w-5 h-5 text-[#9b6f6f]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="font-display text-lg text-[#1a1714] font-semibold">Waitlist Match</h3>
+              <p className="text-sm text-[#8a7e78] mt-1">
+                {waitlistPrompt.count} client{waitlistPrompt.count !== 1 ? "s are" : " is"} on the waitlist
+                {waitlistPrompt.date ? ` for ${new Date(waitlistPrompt.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}.
+                Notify them about this opening?
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setWaitlistPrompt(null)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-[#8a7e78] bg-[#f5f0eb] rounded-xl hover:bg-[#ebe4dd] transition-colors"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => {
+                  setWaitlistPrompt(null);
+                  router.push("/admin/waitlist");
+                }}
+                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-[#9b6f6f] rounded-xl hover:bg-[#8a5f5f] transition-colors"
+              >
+                View Waitlist
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
     </ErrorBoundary>

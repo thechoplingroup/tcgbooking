@@ -73,7 +73,20 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ appointment: data });
+  // If cancelled, check waitlist for matching entries
+  let waitlistCount = 0;
+  if (data && body.status === "cancelled") {
+    const appointmentDate = (data.start_at as string).split("T")[0]; // YYYY-MM-DD
+    const { count } = await serviceClient
+      .from("waitlist_entries")
+      .select("id", { count: "exact", head: true })
+      .eq("stylist_id", stylistId)
+      .eq("status", "waiting")
+      .or(`preferred_date.eq.${appointmentDate},preferred_date.is.null`);
+    waitlistCount = count ?? 0;
+  }
+
+  return NextResponse.json({ appointment: data, waitlist_count: waitlistCount });
 }
 
 export async function DELETE(
