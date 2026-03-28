@@ -98,38 +98,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "One or more services are inactive" }, { status: 400 });
   }
 
-  // Check for conflicts
-  const { data: conflicts } = await supabase
-    .from("appointments")
-    .select("id")
-    .eq("stylist_id", stylist_id)
-    .in("status", ["pending", "confirmed"])
-    .lt("start_at", end_at)
-    .gt("end_at", start_at);
+  // Atomically check conflicts + insert using DB function (prevents race conditions)
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("book_appointment", {
+    p_client_id: user.id,
+    p_walk_in_client_id: null,
+    p_stylist_id: stylist_id,
+    p_service_id: primaryServiceId,
+    p_start_at: start_at,
+    p_end_at: end_at,
+    p_status: "pending",
+    p_client_notes: client_notes?.trim() || null,
+  });
 
-  if (conflicts && conflicts.length > 0) {
-    return NextResponse.json(
-      { error: "This time slot is no longer available." },
-      { status: 409 }
-    );
+  if (rpcError) {
+    if (rpcError.message?.includes("CONFLICT")) {
+      return NextResponse.json({ error: "This time slot is no longer available." }, { status: 409 });
+    }
+    console.error("[api/appointments POST]", { error: rpcError.message, userId: user.id, stylist_id, service_ids: resolvedServiceIds });
+    return NextResponse.json({ error: rpcError.message }, { status: 500 });
   }
 
+  const appointmentId = rpcResult as string;
+
+  // Fetch the created appointment
   const { data: appointment, error } = await supabase
     .from("appointments")
-    .insert({
-      client_id: user.id,
-      stylist_id,
-      service_id: primaryServiceId,
-      start_at,
-      end_at,
-      status: "pending",
-      client_notes: client_notes?.trim() || null,
-    })
     .select("id, start_at, end_at, status, client_notes")
+    .eq("id", appointmentId)
     .single();
 
   if (error) {
-    console.error("[api/appointments POST]", { error: error.message, userId: user.id, stylist_id, service_ids: resolvedServiceIds });
+    console.error("[api/appointments POST] fetch after insert", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

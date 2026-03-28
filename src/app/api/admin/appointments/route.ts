@@ -117,24 +117,8 @@ export async function POST(request: Request) {
 
   const isPast = new Date(start_at) < new Date();
 
-  // Check for time conflicts (skip for past appointments — they're record-keeping)
+  // Check against blocked times (skip for past appointments)
   if (!isPast) {
-    const { data: conflicts } = await serviceClient
-      .from("appointments")
-      .select("id")
-      .eq("stylist_id", stylistId)
-      .in("status", ["pending", "confirmed"])
-      .lt("start_at", end_at)
-      .gt("end_at", start_at);
-
-    if (conflicts && conflicts.length > 0) {
-      return NextResponse.json(
-        { error: "This time slot conflicts with an existing appointment.", conflicts },
-        { status: 409 }
-      );
-    }
-
-    // Check against blocked times
     const { data: blockedConflicts } = await serviceClient
       .from("blocked_times")
       .select("id, reason")
@@ -152,7 +136,58 @@ export async function POST(request: Request) {
 
   const primaryServiceId = service_ids[0]!;
 
-  // Insert appointment
+  // Use atomic DB function for future appointments (prevents double-booking race conditions)
+  // For past appointments, insert directly (no conflict risk)
+  if (!isPast) {
+    const { data: rpcResult, error: rpcError } = await serviceClient.rpc("book_appointment", {
+      p_client_id: client_id || null,
+      p_walk_in_client_id: walk_in_client_id || null,
+      p_stylist_id: stylistId,
+      p_service_id: primaryServiceId,
+      p_start_at: start_at,
+      p_end_at: end_at,
+      p_status: status,
+      p_client_notes: client_notes?.trim() || null,
+      p_final_price_cents: final_price_cents ?? null,
+      p_discount_cents: discount_cents ?? null,
+      p_discount_note: discount_note?.trim() || null,
+    });
+
+    if (rpcError) {
+      if (rpcError.message?.includes("CONFLICT")) {
+        return NextResponse.json(
+          { error: "This time slot conflicts with an existing appointment." },
+          { status: 409 }
+        );
+      }
+      console.error("[api/admin/appointments POST]", { error: rpcError.message });
+      return NextResponse.json({ error: rpcError.message }, { status: 500 });
+    }
+
+    const appointmentId = rpcResult as string;
+    const { data: appointment, error } = await serviceClient
+      .from("appointments")
+      .select("id, start_at, end_at, status, client_notes")
+      .eq("id", appointmentId)
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Insert into appointment_services junction table
+    if (appointment) {
+      const rows = service_ids.map((sid) => ({
+        appointment_id: appointment.id,
+        service_id: sid,
+      }));
+      await serviceClient.from("appointment_services").insert(rows);
+    }
+
+    return NextResponse.json({ appointment }, { status: 201 });
+  }
+
+  // Past appointments — direct insert (no conflict risk)
   const { data: appointment, error } = await serviceClient
     .from("appointments")
     .insert({
