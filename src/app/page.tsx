@@ -43,6 +43,16 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Admin link - subtle, bottom of hero */}
+      <div className="pb-6 text-center">
+        <Link
+          href="/admin"
+          className="text-xs text-[#c9b8a8] hover:text-[#8a7e78] transition-colors"
+        >
+          Admin
+        </Link>
+      </div>
+
       {/* Services strip */}
       <div className="border-t border-[#e8e2dc] bg-white">
         <div className="max-w-4xl mx-auto px-6 py-8">
