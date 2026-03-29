@@ -31,6 +31,8 @@ function formatCents(cents: number): string {
 
 function HorizontalBar({ label, value, max, stacked = false }: { label: string; value: number; max: number; stacked?: boolean }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
+  // Only show a minimum-width bar when value > 0 (so 0-value bars stay empty)
+  const barPct = value > 0 ? Math.max(pct, 4) : 0;
   if (stacked) {
     return (
       <div className="mb-3">
@@ -41,7 +43,7 @@ function HorizontalBar({ label, value, max, stacked = false }: { label: string; 
         <div className="w-full h-5 bg-[#f5f0eb] rounded-lg overflow-hidden">
           <div
             className="h-full bg-[#9b6f6f] rounded-lg transition-all duration-500"
-            style={{ width: `${Math.max(pct, 2)}%` }}
+            style={{ width: `${barPct}%` }}
           />
         </div>
       </div>
@@ -53,7 +55,7 @@ function HorizontalBar({ label, value, max, stacked = false }: { label: string; 
       <div className="flex-1 h-7 bg-[#f5f0eb] rounded-lg overflow-hidden relative">
         <div
           className="h-full bg-[#9b6f6f] rounded-lg transition-all duration-500"
-          style={{ width: `${Math.max(pct, 2)}%` }}
+          style={{ width: `${barPct}%` }}
         />
         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-[#5c4a42]">
           {value}
@@ -117,7 +119,7 @@ export default function AnalyticsPageClient({ initialData, error }: AnalyticsPag
       <div className="bg-white rounded-2xl border border-[#e8e2dc] p-5 mb-4">
         <h2 className="font-display text-lg text-[#1a1714] mb-4">Busiest Days</h2>
         {DAY_LABELS.map((label, i) => (
-          <HorizontalBar key={label} label={label} value={data.dayOfWeekCounts[i]} max={maxDow} />
+          <HorizontalBar key={label} label={label} value={data.dayOfWeekCounts[i]} max={maxDow} stacked />
         ))}
       </div>
 
@@ -143,7 +145,7 @@ export default function AnalyticsPageClient({ initialData, error }: AnalyticsPag
                 <div className="w-full bg-[#f5f0eb] rounded-t-lg relative" style={{ height: "100px" }}>
                   <div
                     className="absolute bottom-0 left-0 right-0 bg-[#9b6f6f] rounded-t-lg transition-all duration-500"
-                    style={{ height: `${Math.max(pct, 3)}%` }}
+                    style={{ height: `${m.count > 0 ? Math.max(pct, 4) : 0}%` }}
                   />
                 </div>
                 <span className="text-[10px] text-[#8a7e78]">{m.month}</span>

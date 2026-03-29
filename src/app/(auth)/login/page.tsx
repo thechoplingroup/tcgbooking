@@ -56,31 +56,37 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-[#5c4a42] mb-1.5">Email</label>
+        <label htmlFor="email" className="block text-sm font-medium text-[#5c4a42] mb-1.5">Email</label>
         <input
+          id="email"
           type="email"
           required
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="w-full border border-[#e8e2dc] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
           placeholder="you@example.com"
+          style={{ fontSize: 16 }}
         />
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="block text-sm font-medium text-[#5c4a42]">Password</label>
+          <label htmlFor="password" className="block text-sm font-medium text-[#5c4a42]">Password</label>
           <Link href="/reset-password" className="text-xs text-[#9b6f6f] hover:text-[#8a5f5f] min-h-[44px] flex items-center">
             Forgot password?
           </Link>
         </div>
         <input
+          id="password"
           type="password"
           required
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full border border-[#e8e2dc] rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-[#faf9f7]"
           placeholder="••••••••"
+          style={{ fontSize: 16 }}
         />
       </div>
 

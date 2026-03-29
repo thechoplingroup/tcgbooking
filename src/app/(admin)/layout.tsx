@@ -305,7 +305,7 @@ export default async function AdminLayout({
         {/* Main content — with bottom padding for mobile nav */}
         <div className="flex-1 min-w-0 flex flex-col">
           <PendingBanner />
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto pb-24 lg:pb-8">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto pb-24 lg:pb-8 max-w-6xl">
             <ErrorBoundary>
               <Suspense fallback={<PageSkeleton />}>
                 {children}

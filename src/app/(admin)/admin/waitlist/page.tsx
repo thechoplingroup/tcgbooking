@@ -345,7 +345,7 @@ function NotifyModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/30" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl border border-[#e8e2dc] shadow-xl w-full max-w-md max-h-[85vh] flex flex-col"
+        className="bg-white rounded-2xl border border-[#e8e2dc] shadow-xl w-full max-w-md max-h-[85dvh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5 border-b border-[#e8e2dc]">
@@ -489,7 +489,7 @@ function AddWaitlistModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/30" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl border border-[#e8e2dc] shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto"
+        className="bg-white rounded-2xl border border-[#e8e2dc] shadow-xl w-full max-w-md max-h-[85dvh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5 border-b border-[#e8e2dc]">

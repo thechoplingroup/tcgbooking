@@ -43,14 +43,11 @@ export async function GET(request: Request) {
 
   const emailMap: Record<string, string> = {};
   if (authClientIds.length > 0) {
-    const { data: usersData } = await serviceClient.auth.admin.listUsers({ perPage: 1000 });
-    if (usersData?.users) {
-      for (const u of usersData.users) {
-        if (authClientIds.includes(u.id) && u.email) {
-          emailMap[u.id] = u.email;
-        }
-      }
-    }
+    const { resolveEmails } = await import("@/lib/supabase/resolve-emails");
+    const resolved = await resolveEmails(authClientIds);
+    resolved.forEach((email, id) => {
+      emailMap[id] = email;
+    });
   }
 
   const enriched = entries.map((entry: Record<string, unknown>) => ({

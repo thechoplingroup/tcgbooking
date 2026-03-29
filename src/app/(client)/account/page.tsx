@@ -18,20 +18,25 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) { router.replace("/login"); return; }
-      setEmail(user.email ?? null);
-      supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user.id)
-        .single()
-        .then(({ data }) => {
-          setName(data?.full_name ?? null);
-          setLoading(false);
-        });
-    });
+    async function loadProfile() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { router.replace("/login"); return; }
+        setEmail(user.email ?? null);
+        const { data } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", user.id)
+          .single();
+        setName(data?.full_name ?? null);
+      } catch {
+        router.replace("/login");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProfile();
   }, [router]);
 
   async function handleSignOut() {

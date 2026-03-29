@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import Link from "next/link";
 import PendingRequestsList from "@/components/PendingRequestsList";
 import DashboardQuickActions from "@/components/DashboardQuickActions";
@@ -58,6 +59,29 @@ function getWeekRange(): { start: string; end: string } {
   };
 }
 
+function getUpcomingRange(): { start: string; end: string } {
+  const now = new Date();
+  const todayStr = now.toLocaleDateString("en-CA", { timeZone: STUDIO.timezone });
+  const [y, m, day] = todayStr.split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(y!, m! - 1, day!));
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const endDate = new Date(tomorrow);
+  endDate.setUTCDate(tomorrow.getUTCDate() + 6);
+  return {
+    start: tomorrow.toISOString().split("T")[0]! + "T00:00:00",
+    end: endDate.toISOString().split("T")[0]! + "T23:59:59",
+  };
+}
+
+function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: STUDIO.timezone,
+  });
+}
+
 function getGreeting(): string {
   const hour = new Date().toLocaleString("en-US", {
     hour: "numeric",
@@ -111,14 +135,17 @@ export default async function AdminDashboardPage() {
 
   const today = getTodayRange();
   const week = getWeekRange();
+  const upcoming = getUpcomingRange();
+  const svc = createServiceClient();
 
   const [
     { data: todayAppts },
     { count: weekCount },
     { count: pendingCount },
     { data: pendingAppts },
+    { data: upcomingAppts },
   ] = await Promise.all([
-    supabase
+    svc
       .from("appointments")
       .select(`*, client:profiles!client_id(id, full_name), service:services!service_id(id, name, duration_minutes, internal_price_cents), appointment_services(service_id, service:services(id, name, duration_minutes))`)
       .eq("stylist_id", stylist.id)
@@ -126,20 +153,20 @@ export default async function AdminDashboardPage() {
       .gte("start_at", today.start)
       .lte("start_at", today.end)
       .order("start_at"),
-    supabase
+    svc
       .from("appointments")
       .select("id", { count: "exact", head: true })
       .eq("stylist_id", stylist.id)
       .in("status", ["pending", "confirmed"])
       .gte("start_at", week.start)
       .lte("start_at", week.end),
-    supabase
+    svc
       .from("appointments")
       .select("id", { count: "exact", head: true })
       .eq("stylist_id", stylist.id)
       .eq("status", "pending")
       .gte("start_at", new Date().toISOString()),
-    supabase
+    svc
       .from("appointments")
       .select(`*, client:profiles!client_id(id, full_name), service:services!service_id(id, name, duration_minutes), appointment_services(service_id, service:services(id, name, duration_minutes))`)
       .eq("stylist_id", stylist.id)
@@ -147,10 +174,20 @@ export default async function AdminDashboardPage() {
       .gte("start_at", new Date().toISOString())
       .order("start_at")
       .limit(10),
+    svc
+      .from("appointments")
+      .select(`*, client:profiles!client_id(id, full_name), service:services!service_id(id, name, duration_minutes), appointment_services(service_id, service:services(id, name, duration_minutes))`)
+      .eq("stylist_id", stylist.id)
+      .in("status", ["pending", "confirmed"])
+      .gte("start_at", upcoming.start)
+      .lte("start_at", upcoming.end)
+      .order("start_at")
+      .limit(20),
   ]);
 
   const todayList = todayAppts ?? [];
   const pendingList = pendingAppts ?? [];
+  const upcomingList = upcomingAppts ?? [];
 
   const now = new Date();
   const todayDate = now.toLocaleDateString("en-US", {
@@ -285,6 +322,80 @@ export default async function AdminDashboardPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* UPCOMING SCHEDULE */}
+      <div className="bg-white rounded-2xl border border-[#e8e2dc] overflow-hidden mb-5">
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#e8e2dc]">
+          <h2 className="font-display text-lg text-[#1a1714]">Upcoming Schedule</h2>
+          <Link href="/admin/appointments" className="text-xs text-[#9b6f6f] font-medium min-h-[44px] flex items-center">
+            View all →
+          </Link>
+        </div>
+
+        {upcomingList.length === 0 ? (
+          <div className="px-4 py-10 text-center">
+            <div className="w-10 h-10 rounded-full bg-[#f5ede8] flex items-center justify-center mx-auto mb-3">
+              <svg className="w-5 h-5 text-[#c9a96e]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <p className="text-sm text-[#1a1714] font-medium">No upcoming appointments</p>
+            <p className="text-xs text-[#8a7e78] mt-1">Your next 7 days are clear</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#f5f0eb]">
+            {(() => {
+              let lastDate = "";
+              return upcomingList.map((appt) => {
+                const service = appt.service as { id: string; name: string; duration_minutes: number } | null;
+                const apptServices = (appt as { appointment_services?: Array<{ service_id: string; service: { id: string; name: string; duration_minutes: number } | null }> }).appointment_services;
+                const client = appt.client as { id: string; full_name: string | null } | null;
+                const status = appt.status as string;
+
+                const allSvcs = apptServices && apptServices.length > 0
+                  ? apptServices.map((as_row) => as_row.service).filter((s): s is { id: string; name: string; duration_minutes: number } => s !== null)
+                  : service ? [service] : [];
+                const svcNames = allSvcs.map((s) => s.name).join(", ") || "Service";
+                const svcDuration = allSvcs.reduce((sum, s) => sum + s.duration_minutes, 0);
+
+                const dateStr = formatShortDate(appt.start_at as string);
+                const showDate = dateStr !== lastDate;
+                lastDate = dateStr;
+
+                return (
+                  <div key={appt.id}>
+                    {showDate && (
+                      <div className="px-4 pt-3 pb-1">
+                        <p className="text-[10px] font-semibold text-[#c9a96e] uppercase tracking-widest">{dateStr}</p>
+                      </div>
+                    )}
+                    <div className="px-4 py-3 flex items-center gap-3">
+                      <div className="flex-shrink-0 text-center min-w-[56px]">
+                        <p className="text-sm font-bold text-[#1a1714]">{formatTime(appt.start_at as string)}</p>
+                        <p className="text-[10px] text-[#8a7e78]">{svcDuration > 0 ? formatDuration(svcDuration) : ""}</p>
+                      </div>
+                      <div className="flex-shrink-0 flex flex-col items-center self-stretch py-1">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-0.5 ${status === "confirmed" ? "bg-[#9b6f6f]" : "bg-[#d97706]"}`} />
+                        <div className="w-px flex-1 bg-[#e8e2dc] mt-1" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[#1a1714] truncate">
+                          {client?.full_name ?? "Guest"}
+                        </p>
+                        <p className="text-xs text-[#8a7e78] mt-0.5 truncate">{svcNames}</p>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${status === "confirmed" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                        {status === "confirmed" ? "Confirmed" : "Pending"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
       </div>

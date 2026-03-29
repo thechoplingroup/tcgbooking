@@ -131,15 +131,15 @@ export async function GET(request: Request) {
   clients = clients.slice(offset, offset + limit);
   const hasMore = offset + clients.length < total;
 
-  // Fetch emails in bulk via auth.admin.listUsers (single call instead of N)
+  // Fetch emails in bulk via batched getUserById (not listUsers)
   const authClientIds = clients
     .filter((c) => c.clientType === "auth")
     .map((c) => c.id);
 
   if (authClientIds.length > 0) {
     try {
-      const { data: { users } } = await serviceClient.auth.admin.listUsers({ perPage: 1000 });
-      const emailMap = new Map(users.map((u) => [u.id, u.email ?? null]));
+      const { resolveEmails } = await import("@/lib/supabase/resolve-emails");
+      const emailMap = await resolveEmails(authClientIds);
       for (const c of clients) {
         if (c.clientType === "auth") {
           c.email = emailMap.get(c.id) ?? null;

@@ -49,7 +49,7 @@ export default function PendingBanner() {
   return (
     <Link
       href="/admin/requests"
-      className="sticky top-[53px] lg:top-0 z-30 flex items-center justify-center gap-2 bg-amber-100 border-b border-amber-200 px-4 py-2.5 text-amber-800 text-sm font-semibold hover:bg-amber-200 transition-colors"
+      className="sticky top-[calc(53px+env(safe-area-inset-top,0px))] lg:top-0 z-30 flex items-center justify-center gap-2 bg-amber-100 border-b border-amber-200 px-4 py-2.5 text-amber-800 text-sm font-semibold hover:bg-amber-200 transition-colors"
     >
       <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
       You have {count} pending request{count === 1 ? "" : "s"} — tap to review

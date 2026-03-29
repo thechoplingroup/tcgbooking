@@ -90,17 +90,13 @@ export async function GET(request: Request) {
 async function processAppointments(supabase: any, appointments: any[], errors: string[]) {
   let sent = 0;
 
-  // Get emails in bulk via listUsers (single call instead of N)
+  // Get emails in bulk via batched getUserById (not listUsers)
   const clientIds = Array.from(new Set(appointments.map((a: { client_id: string }) => a.client_id)));
-  const emailMap = new Map<string, string>();
+  let emailMap = new Map<string, string>();
 
   try {
-    const { data: { users } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-    for (const u of users) {
-      if (clientIds.includes(u.id) && u.email) {
-        emailMap.set(u.id, u.email);
-      }
-    }
+    const { resolveEmails } = await import("@/lib/supabase/resolve-emails");
+    emailMap = await resolveEmails(clientIds);
   } catch {
     // Fallback: no emails available
   }

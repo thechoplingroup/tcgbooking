@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAdminContext } from "@/lib/supabase/admin-auth";
 import { NextResponse } from "next/server";
@@ -17,12 +16,12 @@ export async function GET(request: Request) {
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { stylistId } = ctx;
 
-  const supabase = await createClient();
+  const serviceClient = createServiceClient();
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status"); // optional filter
 
-  let query = supabase
+  let query = serviceClient
     .from("appointments")
     .select(APPT_SELECT)
     .eq("stylist_id", stylistId)
