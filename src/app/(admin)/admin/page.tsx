@@ -191,12 +191,12 @@ export default async function AdminDashboardPage() {
 
   // Resolve emails for clients whose full_name is null (shows as "Guest" otherwise)
   const allAppts = [...todayList, ...pendingList, ...upcomingList];
-  const nullNameClientIds = allAppts
-    .filter((a) => {
-      const client = a.client as { id: string; full_name: string | null } | null;
-      return client && !client.full_name;
-    })
-    .map((a) => (a.client as { id: string }).id);
+  const nullNameClientIds: string[] = [];
+  for (const a of allAppts) {
+    const raw = a.client;
+    const client = Array.isArray(raw) ? raw[0] : raw;
+    if (client && !client.full_name) nullNameClientIds.push(client.id);
+  }
 
   let clientEmailMap = new Map<string, string>();
   if (nullNameClientIds.length > 0) {
@@ -204,8 +204,16 @@ export default async function AdminDashboardPage() {
     clientEmailMap = await resolveEmails(Array.from(new Set(nullNameClientIds)));
   }
 
+  /** Normalize client — service client may return array instead of object from join */
+  function normalizeClient(raw: unknown): { id: string; full_name: string | null } | null {
+    if (!raw) return null;
+    if (Array.isArray(raw)) return raw[0] ?? null;
+    return raw as { id: string; full_name: string | null };
+  }
+
   /** Get display name: full_name → email prefix → "Guest" */
-  function getClientName(client: { id: string; full_name: string | null } | null): string {
+  function getClientName(raw: unknown): string {
+    const client = normalizeClient(raw);
     if (client?.full_name) return client.full_name;
     if (client) {
       const email = clientEmailMap.get(client.id);
@@ -316,7 +324,7 @@ export default async function AdminDashboardPage() {
             {todayList.map((appt) => {
               const service = appt.service as { id: string; name: string; duration_minutes: number } | null;
               const apptServices = (appt as { appointment_services?: Array<{ service_id: string; service: { id: string; name: string; duration_minutes: number } | null }> }).appointment_services;
-              const client = appt.client as { id: string; full_name: string | null } | null;
+              const client = normalizeClient(appt.client);
 
               // Prefer appointment_services, fall back to primary service
               const allSvcs = apptServices && apptServices.length > 0
@@ -378,7 +386,7 @@ export default async function AdminDashboardPage() {
               return upcomingList.map((appt) => {
                 const service = appt.service as { id: string; name: string; duration_minutes: number } | null;
                 const apptServices = (appt as { appointment_services?: Array<{ service_id: string; service: { id: string; name: string; duration_minutes: number } | null }> }).appointment_services;
-                const client = appt.client as { id: string; full_name: string | null } | null;
+                const client = normalizeClient(appt.client);
                 const status = appt.status as string;
 
                 const allSvcs = apptServices && apptServices.length > 0

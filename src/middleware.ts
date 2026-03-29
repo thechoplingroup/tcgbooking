@@ -84,14 +84,31 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Check role for authenticated users
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  // Check role — use cached cookie to avoid a Supabase query on every request
+  let role: string | undefined;
+  const cachedRole = request.cookies.get("x-user-role")?.value;
 
-  const role = profile?.role;
+  if (cachedRole && (cachedRole === "stylist" || cachedRole === "client" || cachedRole === "admin")) {
+    role = cachedRole;
+  } else {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    role = profile?.role;
+
+    // Cache role in a cookie for subsequent requests (expires in 1 hour)
+    if (role) {
+      supabaseResponse.cookies.set("x-user-role", role, {
+        path: "/",
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        maxAge: 3600,
+      });
+    }
+  }
 
   // Stylists → always go to /admin, redirect away from client pages
   if (role === "stylist") {
