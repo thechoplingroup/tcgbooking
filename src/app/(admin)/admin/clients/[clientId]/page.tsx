@@ -929,9 +929,12 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
                         {(a.status === "confirmed" || a.status === "cancelled") && editingPricing !== a.id && (
                           <button
                             onClick={() => startPricingEdit(a)}
-                            className="text-[11px] text-[#9b6f6f] hover:text-[#8a5f5f] font-medium transition-colors min-h-[44px] flex items-center"
+                            className="p-1.5 rounded-lg text-[#8a7e78] hover:text-[#9b6f6f] hover:bg-[#f5f0eb] transition-all"
+                            title="Edit pricing"
                           >
-                            $
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
                           </button>
                         )}
                         {editingPricing !== a.id && (
@@ -1025,12 +1028,12 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
         )}
 
         {/* Delete client */}
-        <div className="border-t border-[#e8e2dc] pt-6 mt-8 mb-8">
+        <div className="pt-6 mt-8 mb-8 text-center">
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="w-full py-3 border border-red-200 text-red-600 text-sm font-medium rounded-full hover:bg-red-50 transition-all active:scale-95 min-h-[44px]"
+            className="text-xs text-[#b09090] hover:text-red-500 transition-colors"
           >
-            Delete Client
+            Delete client
           </button>
         </div>
       </div>
@@ -1195,7 +1198,7 @@ function FamilyMembersSection({ profileId }: { profileId: string }) {
       </div>
 
       {showAdd && (
-        <form onSubmit={handleAddDependent} className="bg-[#faf9f7] rounded-xl border border-[#e8e2dc] p-4 mb-3 flex gap-2 items-center">
+        <form onSubmit={handleAddDependent} className="bg-[#faf9f7] rounded-xl border border-[#e8e2dc] p-4 mb-3 space-y-3">
           <input
             type="text"
             value={addName}
@@ -1203,23 +1206,25 @@ function FamilyMembersSection({ profileId }: { profileId: string }) {
             placeholder="Family member's name…"
             required
             autoFocus
-            className="flex-1 border border-[#e8e2dc] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-white"
+            className="w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-white"
             style={{ fontSize: 16 }}
           />
-          <button
-            type="submit"
-            disabled={addSubmitting || !addName.trim()}
-            className="px-4 py-2 bg-[#9b6f6f] text-white text-sm font-semibold rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-all active:scale-95 min-h-[44px]"
-          >
-            {addSubmitting ? "Adding…" : "Add"}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowAdd(false); setAddName(""); }}
-            className="px-3 py-2 text-sm text-[#8a7e78] hover:text-[#1a1714] transition-colors min-h-[44px]"
-          >
-            Cancel
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={addSubmitting || !addName.trim()}
+              className="flex-1 py-2.5 bg-[#9b6f6f] text-white text-sm font-semibold rounded-full hover:bg-[#8a5f5f] disabled:opacity-50 transition-all active:scale-95 min-h-[44px]"
+            >
+              {addSubmitting ? "Adding…" : "Add family member"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowAdd(false); setAddName(""); }}
+              className="px-5 py-2.5 border border-[#e8e2dc] text-sm text-[#8a7e78] font-medium rounded-full hover:bg-white transition-all min-h-[44px]"
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       )}
 
