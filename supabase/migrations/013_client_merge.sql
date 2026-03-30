@@ -144,7 +144,19 @@ END;
 $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 5. Update handle_new_user() trigger to detect email matches
+-- 5. Helper: check if an email is already registered (used by admin API)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION check_email_registered(p_email TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS(SELECT 1 FROM auth.users WHERE LOWER(email) = LOWER(p_email));
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6. Update handle_new_user() trigger to detect email matches
 --    When a user signs up, check if any unmerged walk-in has the same email.
 --    If found, create a pending_merge suggestion for the stylist to review.
 -- ─────────────────────────────────────────────────────────────────────────────

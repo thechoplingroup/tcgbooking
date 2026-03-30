@@ -136,9 +136,13 @@ export async function POST(request: Request) {
   // Check if a registered account exists with this email — non-blocking warning
   let emailWarning: string | null = null;
   if (cleanEmail) {
-    const { data: existingUser } = await serviceClient.auth.admin.getUserByEmail(cleanEmail);
-    if (existingUser?.user) {
-      emailWarning = "A registered account with this email already exists. You can merge them later from the Clients page.";
+    try {
+      const { data: exists } = await serviceClient.rpc("check_email_registered", { p_email: cleanEmail });
+      if (exists) {
+        emailWarning = "A registered account with this email already exists. You can merge them later from the Clients page.";
+      }
+    } catch {
+      // Non-blocking — skip warning if check fails
     }
   }
 
