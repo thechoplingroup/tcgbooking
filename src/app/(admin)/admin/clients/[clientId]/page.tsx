@@ -593,22 +593,22 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
           </Link>
 
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#f5ede8] to-[#e8d8d0] flex items-center justify-center flex-shrink-0 border border-[#e8e2dc]">
-                <span className="text-[#9b6f6f] font-semibold text-lg">
-                  {(client.full_name ?? client.email ?? "?").charAt(0).toUpperCase()}
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#f5ede8] to-[#e8d8d0] flex items-center justify-center flex-shrink-0 border border-[#e8e2dc]">
+                <span className="text-[#9b6f6f] font-semibold text-base">
+                  {(() => {
+                    const name = client.full_name ?? client.email ?? "?";
+                    const parts = name.trim().split(/\s+/);
+                    if (parts.length >= 2) return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+                    return name.charAt(0).toUpperCase();
+                  })()}
                 </span>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="font-display text-2xl text-[#1a1714]">
+                  <h1 className="font-display text-2xl text-[#1a1714] leading-tight">
                     {client.full_name ?? "(no name)"}
                   </h1>
-                  {isWalkin && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#c9a96e]/15 text-[#a08540]">
-                      Walk-in
-                    </span>
-                  )}
                   <button
                     onClick={() => {
                       setEditForm({
@@ -619,7 +619,7 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
                       });
                       setShowEditClient(true);
                     }}
-                    className="p-1.5 rounded-lg text-[#8a7e78] hover:text-[#9b6f6f] hover:bg-[#f5f0eb] transition-all"
+                    className="p-1.5 rounded-lg text-[#8a7e78] hover:text-[#9b6f6f] hover:bg-[#f5f0eb] transition-all flex-shrink-0"
                     title="Edit client"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -627,9 +627,16 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
                     </svg>
                   </button>
                 </div>
-                <p className="text-sm text-[#8a7e78]">{client.email ?? "—"}</p>
+                {isWalkin && (
+                  <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#c9a96e]/15 text-[#a08540] mt-1">
+                    Walk-in client
+                  </span>
+                )}
+                {client.email && (
+                  <p className="text-sm text-[#8a7e78] mt-1">{client.email}</p>
+                )}
                 {client.phone && (
-                  <a href={`tel:${client.phone}`} className="text-sm text-[#9b6f6f] hover:underline">
+                  <a href={`tel:${client.phone}`} className="text-sm text-[#9b6f6f] hover:underline block mt-0.5">
                     {client.phone}
                   </a>
                 )}
@@ -1232,7 +1239,7 @@ function FamilyMembersSection({ profileId }: { profileId: string }) {
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#f5ede8] to-[#e8d8d0] flex items-center justify-center flex-shrink-0 border border-[#e8e2dc]">
                 <span className="text-[#9b6f6f] font-semibold text-xs">
-                  {d.full_name.charAt(0).toUpperCase()}
+                  {(() => { const p = d.full_name.trim().split(/\s+/); return p.length >= 2 ? (p[0]![0]! + p[p.length-1]![0]!).toUpperCase() : p[0]![0]!.toUpperCase(); })()}
                 </span>
               </div>
               <div className="flex-1 min-w-0">

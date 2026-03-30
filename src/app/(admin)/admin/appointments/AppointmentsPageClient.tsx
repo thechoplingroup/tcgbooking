@@ -610,26 +610,42 @@ export default function AppointmentsPageClient({
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
-                  <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Start</label>
+                  <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Date</label>
                   <input
-                    type="datetime-local"
-                    value={editAppt.start_at}
-                    onChange={e => setEditAppt(s => s ? { ...s, start_at: e.target.value } : s)}
-                    className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
+                    type="date"
+                    value={editAppt.start_at.split("T")[0] ?? ""}
+                    onChange={e => setEditAppt(s => s ? {
+                      ...s,
+                      start_at: e.target.value + "T" + (s.start_at.split("T")[1] ?? "09:00"),
+                      end_at: e.target.value + "T" + (s.end_at.split("T")[1] ?? "10:00"),
+                    } : s)}
+                    className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-white"
                     style={{ fontSize: 16 }}
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">End</label>
-                  <input
-                    type="datetime-local"
-                    value={editAppt.end_at}
-                    onChange={e => setEditAppt(s => s ? { ...s, end_at: e.target.value } : s)}
-                    className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f]"
-                    style={{ fontSize: 16 }}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">Start time</label>
+                    <input
+                      type="time"
+                      value={editAppt.start_at.split("T")[1] ?? ""}
+                      onChange={e => setEditAppt(s => s ? { ...s, start_at: (s.start_at.split("T")[0] ?? "") + "T" + e.target.value } : s)}
+                      className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-white"
+                      style={{ fontSize: 16 }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-[#8a7e78] uppercase tracking-wide">End time</label>
+                    <input
+                      type="time"
+                      value={editAppt.end_at.split("T")[1] ?? ""}
+                      onChange={e => setEditAppt(s => s ? { ...s, end_at: (s.end_at.split("T")[0] ?? "") + "T" + e.target.value } : s)}
+                      className="mt-1 w-full border border-[#e8e2dc] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9b6f6f] bg-white"
+                      style={{ fontSize: 16 }}
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -147,7 +147,7 @@ export default async function AdminDashboardPage() {
   ] = await Promise.all([
     svc
       .from("appointments")
-      .select(`*, client:profiles!client_id(id, full_name), service:services!service_id(id, name, duration_minutes, internal_price_cents), appointment_services(service_id, service:services(id, name, duration_minutes))`)
+      .select(`*, client:profiles!client_id(id, full_name), walk_in:walk_in_clients!walk_in_client_id(id, full_name), service:services!service_id(id, name, duration_minutes, internal_price_cents), appointment_services(service_id, service:services(id, name, duration_minutes))`)
       .eq("stylist_id", stylist.id)
       .eq("status", "confirmed")
       .gte("start_at", today.start)
@@ -168,7 +168,7 @@ export default async function AdminDashboardPage() {
       .gte("start_at", new Date().toISOString()),
     svc
       .from("appointments")
-      .select(`*, client:profiles!client_id(id, full_name), service:services!service_id(id, name, duration_minutes), appointment_services(service_id, service:services(id, name, duration_minutes))`)
+      .select(`*, client:profiles!client_id(id, full_name), walk_in:walk_in_clients!walk_in_client_id(id, full_name), service:services!service_id(id, name, duration_minutes), appointment_services(service_id, service:services(id, name, duration_minutes))`)
       .eq("stylist_id", stylist.id)
       .eq("status", "pending")
       .gte("start_at", new Date().toISOString())
@@ -176,7 +176,7 @@ export default async function AdminDashboardPage() {
       .limit(10),
     svc
       .from("appointments")
-      .select(`*, client:profiles!client_id(id, full_name), service:services!service_id(id, name, duration_minutes), appointment_services(service_id, service:services(id, name, duration_minutes))`)
+      .select(`*, client:profiles!client_id(id, full_name), walk_in:walk_in_clients!walk_in_client_id(id, full_name), service:services!service_id(id, name, duration_minutes), appointment_services(service_id, service:services(id, name, duration_minutes))`)
       .eq("stylist_id", stylist.id)
       .in("status", ["pending", "confirmed"])
       .gte("start_at", upcoming.start)
@@ -189,7 +189,7 @@ export default async function AdminDashboardPage() {
   const pendingList = pendingAppts ?? [];
   const upcomingList = upcomingAppts ?? [];
 
-  // Resolve emails for clients whose full_name is null (shows as "Guest" otherwise)
+  // Resolve emails for auth clients whose full_name is null
   const allAppts = [...todayList, ...pendingList, ...upcomingList];
   const nullNameClientIds: string[] = [];
   for (const a of allAppts) {
@@ -211,15 +211,18 @@ export default async function AdminDashboardPage() {
     return raw as { id: string; full_name: string | null };
   }
 
-  /** Get display name: full_name → email prefix → "Guest" */
-  function getClientName(raw: unknown): string {
-    const client = normalizeClient(raw);
+  /** Get display name: auth full_name → email prefix → walk-in full_name → name */
+  function getClientName(appt: unknown): string {
+    const a = appt as { client?: unknown; walk_in?: unknown } | null;
+    const client = normalizeClient(a?.client);
     if (client?.full_name) return client.full_name;
     if (client) {
       const email = clientEmailMap.get(client.id);
       if (email) return email.split("@")[0]!;
     }
-    return "Guest";
+    const walkIn = normalizeClient(a?.walk_in);
+    if (walkIn?.full_name) return walkIn.full_name;
+    return "Unknown";
   }
 
   const now = new Date();
@@ -345,7 +348,7 @@ export default async function AdminDashboardPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#1a1714] truncate">
-                      {getClientName(client)}
+                      {getClientName(appt)}
                     </p>
                     <p className="text-xs text-[#8a7e78] mt-0.5 truncate">{svcNames}</p>
                   </div>
@@ -417,7 +420,7 @@ export default async function AdminDashboardPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-[#1a1714] truncate">
-                          {getClientName(client)}
+                          {getClientName(appt)}
                         </p>
                         <p className="text-xs text-[#8a7e78] mt-0.5 truncate">{svcNames}</p>
                       </div>
