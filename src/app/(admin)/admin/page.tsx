@@ -327,8 +327,6 @@ export default async function AdminDashboardPage() {
             {todayList.map((appt) => {
               const service = appt.service as { id: string; name: string; duration_minutes: number } | null;
               const apptServices = (appt as { appointment_services?: Array<{ service_id: string; service: { id: string; name: string; duration_minutes: number } | null }> }).appointment_services;
-              const client = normalizeClient(appt.client);
-
               // Prefer appointment_services, fall back to primary service
               const allSvcs = apptServices && apptServices.length > 0
                 ? apptServices.map((as_row) => as_row.service).filter((s): s is { id: string; name: string; duration_minutes: number } => s !== null)
@@ -389,7 +387,6 @@ export default async function AdminDashboardPage() {
               return upcomingList.map((appt) => {
                 const service = appt.service as { id: string; name: string; duration_minutes: number } | null;
                 const apptServices = (appt as { appointment_services?: Array<{ service_id: string; service: { id: string; name: string; duration_minutes: number } | null }> }).appointment_services;
-                const client = normalizeClient(appt.client);
                 const status = appt.status as string;
 
                 const allSvcs = apptServices && apptServices.length > 0
