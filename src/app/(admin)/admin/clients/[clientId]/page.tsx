@@ -592,7 +592,8 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
             Back to clients
           </Link>
 
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-4">
+            {/* Identity row */}
             <div className="flex items-start gap-4">
               <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#f5ede8] to-[#e8d8d0] flex items-center justify-center flex-shrink-0 border border-[#e8e2dc]">
                 <span className="text-[#9b6f6f] font-semibold text-base">
@@ -604,7 +605,7 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
                   })()}
                 </span>
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h1 className="font-display text-2xl text-[#1a1714] leading-tight">
                     {client.full_name ?? "(no name)"}
@@ -642,7 +643,8 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
                 )}
               </div>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
+            {/* Action buttons — own row, always fits */}
+            <div className="flex gap-2">
               {!isWalkin && client.email && (
                 <button
                   onClick={() => setShowRebook(true)}
@@ -651,7 +653,7 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
-                  <span className="hidden sm:inline">Remind</span>
+                  Send reminder
                 </button>
               )}
               <button
@@ -661,8 +663,7 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
                 <svg className="w-4 h-4 text-[#c9a96e]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span className="hidden sm:inline">Log Service</span>
-                <span className="sm:hidden">Log</span>
+                Log service
               </button>
             </div>
           </div>
