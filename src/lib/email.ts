@@ -22,6 +22,7 @@ interface StatusUpdateData {
   stylistName: string;
   serviceName: string;
   startAt: string;
+  endAt: string;
   status: "confirmed" | "cancelled";
   bookingUrl: string;
 }
@@ -309,7 +310,7 @@ export async function sendWaitlistNotification(data: WaitlistNotificationData): 
 }
 
 export async function sendStatusUpdateEmail(data: StatusUpdateData): Promise<void> {
-  const { clientEmail, clientName, stylistName, serviceName, startAt, status, bookingUrl } = data;
+  const { clientEmail, clientName, stylistName, serviceName, startAt, endAt, status, bookingUrl } = data;
   const dateTime = formatDateTime(startAt);
   const displayName = clientName ?? clientEmail;
 
@@ -317,7 +318,7 @@ export async function sendStatusUpdateEmail(data: StatusUpdateData): Promise<voi
     const calUrl = googleCalendarUrl(
       `${serviceName} with ${stylistName}`,
       startAt,
-      new Date(new Date(startAt).getTime() + 60 * 60 * 1000).toISOString(),
+      endAt,
       `Confirmed appointment with ${stylistName} at ${STUDIO.name}.`
     );
 

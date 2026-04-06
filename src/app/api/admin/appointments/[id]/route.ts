@@ -68,6 +68,7 @@ export async function PATCH(
         stylistName: stylistData?.name ?? "Your Stylist",
         serviceName: service.name,
         startAt: data.start_at as string,
+        endAt: data.end_at as string,
         status: body.status,
         bookingUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://tcgbooking.vercel.app"}/book`,
       }).catch(() => {});
