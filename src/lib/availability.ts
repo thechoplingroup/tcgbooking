@@ -1,7 +1,12 @@
 /**
  * Pure utility functions for availability slot calculation.
  * Extracted from the availability API route for testability.
+ *
+ * All `startMin`/`endMin` values in this file are minutes from studio-local
+ * midnight. `formatSlot` converts them to real UTC ISO instants using the
+ * studio's DST-aware timezone.
  */
+import { studioWallClockToUtcIso } from "@/lib/time";
 
 /** Parse "HH:MM:SS" into total minutes from midnight. */
 export function parseTime(timeStr: string): number {
@@ -70,22 +75,24 @@ export function filterAvailableSlots(
 }
 
 /**
- * Format a slot (in minutes) into ISO 8601 UTC strings for a given date.
- * @param dateStr  - date in "YYYY-MM-DD" format
- * @param startMin - slot start in minutes from midnight
- * @param endMin   - slot end in minutes from midnight
+ * Format a slot (in minutes from studio-local midnight) into real UTC ISO
+ * instants for the given studio-local calendar date.
+ *
+ * @param dateStr  - studio-local date in "YYYY-MM-DD" format
+ * @param startMin - slot start in minutes from studio-local midnight
+ * @param endMin   - slot end in minutes from studio-local midnight
  */
 export function formatSlot(
   dateStr: string,
   startMin: number,
   endMin: number
 ): { start_at: string; end_at: string } {
-  const sh = String(Math.floor(startMin / 60)).padStart(2, "0");
-  const sm = String(startMin % 60).padStart(2, "0");
-  const eh = String(Math.floor(endMin / 60)).padStart(2, "0");
-  const em = String(endMin % 60).padStart(2, "0");
+  const sh = Math.floor(startMin / 60);
+  const sm = startMin % 60;
+  const eh = Math.floor(endMin / 60);
+  const em = endMin % 60;
   return {
-    start_at: `${dateStr}T${sh}:${sm}:00Z`,
-    end_at: `${dateStr}T${eh}:${em}:00Z`,
+    start_at: studioWallClockToUtcIso(dateStr, sh, sm),
+    end_at: studioWallClockToUtcIso(dateStr, eh, em),
   };
 }

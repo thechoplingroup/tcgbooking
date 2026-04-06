@@ -37,7 +37,12 @@ interface Slot {
 type Step = "service" | "date" | "slots" | "confirm" | "done";
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+  // Real UTC instants → rendered in the studio's local zone.
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: STUDIO.timezone,
+  });
 }
 
 function formatDate(dateStr: string): string {
@@ -570,7 +575,12 @@ export default function StylistBookingPage() {
             </div>
           </div>
 
-          <h2 className="font-display text-xl text-[#1a1714] mb-5">Choose a time</h2>
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-display text-xl text-[#1a1714]">Choose a time</h2>
+            <p className="text-[10px] tracking-wide text-[#8a7e78] italic">
+              all times central · {STUDIO.location.split(",")[0]}
+            </p>
+          </div>
 
           {slotsLoading ? <SlotSkeleton /> : slots.length === 0 ? (
             <div className="text-center py-10 bg-white rounded-xl border border-[#e8e2dc]">

@@ -5,57 +5,49 @@ import PendingRequestsList from "@/components/PendingRequestsList";
 import DashboardQuickActions from "@/components/DashboardQuickActions";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { STUDIO } from "@/config/studio";
-import { formatTimeUTC, formatDuration, formatDateShort } from "@/lib/formatters";
+import { formatTime, formatDuration, formatDateShort } from "@/lib/formatters";
+import { studioDateString, studioDayStartUtcIso, studioDayEndUtcIso } from "@/lib/time";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: `Dashboard · ${STUDIO.name}`,
 };
 
+/** Shift a studio-local date string by N days. */
+function shiftStudioDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const next = new Date(Date.UTC(y!, m! - 1, d! + days));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
 function getTodayRange(): { start: string; end: string } {
-  const now = new Date();
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  const start = new Date(d.toLocaleString("en-US", { timeZone: STUDIO.timezone }));
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setHours(23, 59, 59, 999);
-  // Use UTC-based range for the CDT day
-  const todayStr = now.toLocaleDateString("en-CA", { timeZone: STUDIO.timezone });
+  const today = studioDateString(new Date());
   return {
-    start: `${todayStr}T00:00:00`,
-    end: `${todayStr}T23:59:59`,
+    start: studioDayStartUtcIso(today),
+    end: studioDayEndUtcIso(today),
   };
 }
 
 function getWeekRange(): { start: string; end: string } {
-  const now = new Date();
-  const todayStr = now.toLocaleDateString("en-CA", { timeZone: STUDIO.timezone });
-  const [y, m, day] = todayStr.split("-").map(Number);
-  const date = new Date(Date.UTC(y!, m! - 1, day!));
-  const dayOfWeek = date.getUTCDay();
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const monday = new Date(date);
-  monday.setUTCDate(date.getUTCDate() + diff);
-  const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
+  const today = studioDateString(new Date());
+  const [y, m, d] = today.split("-").map(Number);
+  const dow = new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+  const monday = shiftStudioDate(today, diff);
+  const sunday = shiftStudioDate(monday, 6);
   return {
-    start: monday.toISOString().split("T")[0]! + "T00:00:00",
-    end: sunday.toISOString().split("T")[0]! + "T23:59:59",
+    start: studioDayStartUtcIso(monday),
+    end: studioDayEndUtcIso(sunday),
   };
 }
 
 function getUpcomingRange(): { start: string; end: string } {
-  const now = new Date();
-  const todayStr = now.toLocaleDateString("en-CA", { timeZone: STUDIO.timezone });
-  const [y, m, day] = todayStr.split("-").map(Number);
-  const tomorrow = new Date(Date.UTC(y!, m! - 1, day!));
-  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-  const endDate = new Date(tomorrow);
-  endDate.setUTCDate(tomorrow.getUTCDate() + 6);
+  const today = studioDateString(new Date());
+  const tomorrow = shiftStudioDate(today, 1);
+  const endDate = shiftStudioDate(tomorrow, 6);
   return {
-    start: tomorrow.toISOString().split("T")[0]! + "T00:00:00",
-    end: endDate.toISOString().split("T")[0]! + "T23:59:59",
+    start: studioDayStartUtcIso(tomorrow),
+    end: studioDayEndUtcIso(endDate),
   };
 }
 
@@ -314,7 +306,7 @@ export default async function AdminDashboardPage() {
               return (
                 <div key={appt.id} className="px-4 py-3.5 flex items-center gap-3">
                   <div className="flex-shrink-0 text-center min-w-[56px]">
-                    <p className="text-sm font-bold text-[#1a1714]">{formatTimeUTC(appt.start_at as string)}</p>
+                    <p className="text-sm font-bold text-[#1a1714]">{formatTime(appt.start_at as string)}</p>
                     <p className="text-[10px] text-[#8a7e78]">{svcDuration > 0 ? formatDuration(svcDuration) : ""}</p>
                   </div>
                   <div className="flex-shrink-0 flex flex-col items-center self-stretch py-1">
@@ -385,7 +377,7 @@ export default async function AdminDashboardPage() {
                     )}
                     <div className="px-4 py-3 flex items-center gap-3">
                       <div className="flex-shrink-0 text-center min-w-[56px]">
-                        <p className="text-sm font-bold text-[#1a1714]">{formatTimeUTC(appt.start_at as string)}</p>
+                        <p className="text-sm font-bold text-[#1a1714]">{formatTime(appt.start_at as string)}</p>
                         <p className="text-[10px] text-[#8a7e78]">{svcDuration > 0 ? formatDuration(svcDuration) : ""}</p>
                       </div>
                       <div className="flex-shrink-0 flex flex-col items-center self-stretch py-1">

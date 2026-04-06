@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { STUDIO } from "@/config/studio";
 
 interface ServiceInfo {
   id: string;
@@ -44,7 +45,7 @@ function formatDate(iso: string): string {
     weekday: "short",
     month: "short",
     day: "numeric",
-    timeZone: "UTC",
+    timeZone: STUDIO.timezone,
   });
 }
 
@@ -52,7 +53,7 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
-    timeZone: "UTC",
+    timeZone: STUDIO.timezone,
   });
 }
 

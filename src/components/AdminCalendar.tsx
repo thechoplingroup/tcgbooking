@@ -1,6 +1,11 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { STUDIO } from "@/config/studio";
+import {
+  studioMinutesFromMidnight,
+  studioDateString,
+} from "@/lib/time";
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
 
@@ -80,46 +85,68 @@ function serviceNames(appt: AppointmentRow): string {
   return appt.service?.name ?? "Service";
 }
 
-/** Times are "fake-UTC" — use getUTCHours/getUTCMinutes */
+/** Minutes from studio-local midnight for a stored UTC instant. */
 function getMinutesFromMidnight(iso: string): number {
-  const d = new Date(iso);
-  return d.getUTCHours() * 60 + d.getUTCMinutes();
+  return studioMinutesFromMidnight(iso);
 }
 
 function formatTimeShort(iso: string): string {
   const d = new Date(iso);
-  const h = d.getUTCHours();
-  const m = d.getUTCMinutes();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: STUDIO.timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const h = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10) % 24;
+  const m = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
   const suffix = h >= 12 ? "p" : "a";
   const hour12 = h % 12 || 12;
   return m > 0 ? `${hour12}:${String(m).padStart(2, "0")}${suffix}` : `${hour12}${suffix}`;
 }
 
-/** Monday of the week containing `date`. Uses fake-UTC date parts. */
-function getWeekStart(date: Date): Date {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const dayOfWeek = d.getUTCDay(); // 0 = Sun
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  d.setUTCDate(d.getUTCDate() + diff);
-  return d;
+/**
+ * Week grid works on studio-local calendar dates. `CalDay` represents a single
+ * day column by its studio-local date string (YYYY-MM-DD) and a midnight Date
+ * (built in UTC just so `.toLocaleDateString` with the studio tz can render it).
+ */
+interface CalDay {
+  dateStr: string;
+  midnightUtc: Date;
+  dayOfMonth: number;
 }
 
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d;
+function calDayFromStudioDateStr(dateStr: string): CalDay {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const midnightUtc = new Date(Date.UTC(y!, m! - 1, d!));
+  return { dateStr, midnightUtc, dayOfMonth: d! };
 }
 
-function isSameUTCDate(a: Date, b: Date): boolean {
-  return (
-    a.getUTCFullYear() === b.getUTCFullYear() &&
-    a.getUTCMonth() === b.getUTCMonth() &&
-    a.getUTCDate() === b.getUTCDate()
-  );
+/** Monday of the studio-local week containing `date`. */
+function getWeekStart(date: Date): CalDay {
+  const todayStr = studioDateString(date);
+  const [y, m, d] = todayStr.split("-").map(Number);
+  const anchor = new Date(Date.UTC(y!, m! - 1, d!));
+  const dow = anchor.getUTCDay(); // 0 = Sun
+  const diff = dow === 0 ? -6 : 1 - dow;
+  anchor.setUTCDate(anchor.getUTCDate() + diff);
+  const ds = `${anchor.getUTCFullYear()}-${String(anchor.getUTCMonth() + 1).padStart(2, "0")}-${String(anchor.getUTCDate()).padStart(2, "0")}`;
+  return calDayFromStudioDateStr(ds);
 }
 
-function formatDateHeader(date: Date): string {
-  return date.toLocaleDateString([], { month: "short", day: "numeric", timeZone: "UTC" });
+function addDays(day: CalDay, n: number): CalDay {
+  const next = new Date(day.midnightUtc);
+  next.setUTCDate(next.getUTCDate() + n);
+  const ds = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+  return calDayFromStudioDateStr(ds);
+}
+
+function formatDateHeader(day: CalDay): string {
+  return day.midnightUtc.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 /* ─── Component ─────────────────────────────────────────────────────── */
@@ -129,7 +156,7 @@ export default function AdminCalendar({
   blockedTimes = [],
   onAppointmentClick,
 }: AdminCalendarProps) {
-  const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()));
+  const [weekStart, setWeekStart] = useState<CalDay>(() => getWeekStart(new Date()));
   const [now, setNow] = useState<Date>(new Date());
 
   // Tick the clock every minute for the current-time indicator
@@ -143,13 +170,13 @@ export default function AdminCalendar({
     [weekStart],
   );
 
-  // Bucket appointments by day index (0-6)
+  // Bucket appointments by day index (0-6) using studio-local date.
   const apptsByDay = useMemo(() => {
     const buckets: AppointmentRow[][] = Array.from({ length: 7 }, () => []);
     for (const appt of appointments) {
-      const apptDate = new Date(appt.start_at);
+      const ds = studioDateString(appt.start_at);
       for (let i = 0; i < 7; i++) {
-        if (isSameUTCDate(apptDate, weekDays[i]!)) {
+        if (ds === weekDays[i]!.dateStr) {
           buckets[i]!.push(appt);
           break;
         }
@@ -158,13 +185,13 @@ export default function AdminCalendar({
     return buckets;
   }, [appointments, weekDays]);
 
-  // Bucket blocked times by day index
+  // Bucket blocked times by day index using studio-local date.
   const blockedByDay = useMemo(() => {
     const buckets: BlockedTime[][] = Array.from({ length: 7 }, () => []);
     for (const bt of blockedTimes) {
-      const btDate = new Date(bt.start_at);
+      const ds = studioDateString(bt.start_at);
       for (let i = 0; i < 7; i++) {
-        if (isSameUTCDate(btDate, weekDays[i]!)) {
+        if (ds === weekDays[i]!.dateStr) {
           buckets[i]!.push(bt);
           break;
         }
@@ -173,13 +200,14 @@ export default function AdminCalendar({
     return buckets;
   }, [blockedTimes, weekDays]);
 
-  // Current-time indicator position
-  const isCurrentWeek = weekDays.some((d) => isSameUTCDate(d, now));
-  const nowMinutes = now.getHours() * 60 + now.getMinutes(); // real local time for indicator
+  // Current-time indicator position (studio local).
+  const nowStudioDateStr = studioDateString(now);
+  const isCurrentWeek = weekDays.some((d) => d.dateStr === nowStudioDateStr);
+  const nowMinutes = studioMinutesFromMidnight(now);
   const nowTop = ((nowMinutes - HOUR_START * 60) / (TOTAL_HOURS * 60)) * (TOTAL_HOURS * HOUR_HEIGHT);
   const showNowLine = isCurrentWeek && nowMinutes >= HOUR_START * 60 && nowMinutes <= HOUR_END * 60;
   const todayIndex = isCurrentWeek
-    ? weekDays.findIndex((d) => isSameUTCDate(d, now))
+    ? weekDays.findIndex((d) => d.dateStr === nowStudioDateStr)
     : -1;
 
   function prevWeek() {
@@ -247,7 +275,7 @@ export default function AdminCalendar({
                     : "text-[#1a1714]"
                 }`}
               >
-                {d.getUTCDate()}
+                {d.dayOfMonth}
               </p>
             </div>
           );

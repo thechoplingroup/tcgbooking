@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { STUDIO } from "@/config/studio";
 
 // Service → rebooking interval mapping
 function getRebookInterval(serviceName: string): string {
@@ -899,13 +900,13 @@ function ClientDetailInner({ params }: { params: { clientId: string } }) {
                             month: "short",
                             day: "numeric",
                             year: new Date(a.start_at).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
-                            timeZone: "UTC",
+                            timeZone: STUDIO.timezone,
                           })}{" "}
                           ·{" "}
                           {new Date(a.start_at).toLocaleTimeString("en-US", {
                             hour: "numeric",
                             minute: "2-digit",
-                            timeZone: "UTC",
+                            timeZone: STUDIO.timezone,
                           })}
                         </p>
                         {/* Pricing info */}

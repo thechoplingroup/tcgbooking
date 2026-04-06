@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/components/Toast";
+import { STUDIO } from "@/config/studio";
 
 interface ServiceInfo {
   id: string;
@@ -41,7 +42,11 @@ function totalDuration(appt: RequestRow): number {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: STUDIO.timezone,
+  });
 }
 
 function formatDuration(min: number): string {
@@ -52,11 +57,11 @@ function formatDuration(min: number): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString([], {
+  return new Date(iso).toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
-    timeZone: "UTC",
+    timeZone: STUDIO.timezone,
   });
 }
 

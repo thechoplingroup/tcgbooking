@@ -145,21 +145,24 @@ describe("filterAvailableSlots", () => {
 // ─── 5. formatSlot ───────────────────────────────────────────────────────────
 
 describe("formatSlot", () => {
-  it("formats slot minutes into correct ISO strings with Z suffix", () => {
+  // The studio timezone is America/Chicago. formatSlot emits REAL UTC
+  // instants, so March 15 2025 (CDT, UTC-5) at 10:00 Central → 15:00 UTC.
+  it("converts studio wall clock to UTC during DST (CDT, UTC-5)", () => {
     const result = formatSlot("2025-03-15", 600, 660);
 
     expect(result).toEqual({
-      start_at: "2025-03-15T10:00:00Z",
-      end_at: "2025-03-15T11:00:00Z",
+      start_at: "2025-03-15T15:00:00.000Z",
+      end_at: "2025-03-15T16:00:00.000Z",
     });
   });
 
-  it("pads single-digit hours and minutes correctly", () => {
+  it("converts studio wall clock to UTC during standard time (CST, UTC-6)", () => {
+    // Jan 1 is CST: 01:05 Central → 07:05 UTC.
     const result = formatSlot("2025-01-01", 65, 125);
 
     expect(result).toEqual({
-      start_at: "2025-01-01T01:05:00Z",
-      end_at: "2025-01-01T02:05:00Z",
+      start_at: "2025-01-01T07:05:00.000Z",
+      end_at: "2025-01-01T08:05:00.000Z",
     });
   });
 });
@@ -214,13 +217,13 @@ describe("integration: slot generation + filtering", () => {
       { startMin: 660, endMin: 720 },
     ]);
 
-    // Format the results
+    // Format the results (June 15 2025 is CDT, UTC-5 → +5h).
     const formatted = available2.map((s) =>
       formatSlot("2025-06-15", s.startMin, s.endMin)
     );
     expect(formatted[0]).toEqual({
-      start_at: "2025-06-15T10:00:00Z",
-      end_at: "2025-06-15T11:00:00Z",
+      start_at: "2025-06-15T15:00:00.000Z",
+      end_at: "2025-06-15T16:00:00.000Z",
     });
   });
 });

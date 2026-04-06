@@ -16,14 +16,16 @@ interface AppointmentWithDetails {
 }
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString([], {
+  return new Date(iso).toLocaleString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
-    hour: "2-digit", minute: "2-digit", timeZone: "UTC",
+    hour: "2-digit", minute: "2-digit", timeZone: STUDIO.timezone,
   });
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit", timeZone: STUDIO.timezone,
+  });
 }
 
 function formatDuration(min: number): string {
@@ -235,13 +237,13 @@ export default function AppointmentsPage() {
                       {/* Date badge */}
                       <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-[#f5ede8] flex flex-col items-center justify-center">
                         <span className="text-[10px] font-semibold text-[#c9a96e] uppercase leading-none">
-                          {new Date(appt.start_at).toLocaleDateString([], { weekday: "short", timeZone: "UTC" })}
+                          {new Date(appt.start_at).toLocaleDateString([], { weekday: "short", timeZone: STUDIO.timezone })}
                         </span>
                         <span className="text-lg font-bold text-[#9b6f6f] leading-none mt-0.5">
-                          {new Date(appt.start_at).toLocaleDateString([], { day: "numeric", timeZone: "UTC" })}
+                          {new Date(appt.start_at).toLocaleDateString([], { day: "numeric", timeZone: STUDIO.timezone })}
                         </span>
                         <span className="text-[9px] text-[#8a7e78] uppercase leading-none mt-0.5">
-                          {new Date(appt.start_at).toLocaleDateString([], { month: "short", timeZone: "UTC" })}
+                          {new Date(appt.start_at).toLocaleDateString([], { month: "short", timeZone: STUDIO.timezone })}
                         </span>
                       </div>
 

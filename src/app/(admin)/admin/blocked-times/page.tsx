@@ -3,33 +3,47 @@
 import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/components/Toast";
 import type { BlockedTime } from "@/lib/supabase/types";
+import { STUDIO } from "@/config/studio";
+import {
+  studioWallClockToUtcIso,
+  studioDateString,
+  studioDateTimeLocalToUtcIso,
+} from "@/lib/time";
 
 function formatRange(startIso: string, endIso: string): string {
   const start = new Date(startIso);
   const end = new Date(endIso);
-  // Times are stored as Central wall-clock labeled as UTC (see src/lib/formatters.ts).
-  // Use getUTC* for same-day comparison and pass timeZone: "UTC" to readers.
-  const sameDay =
-    start.getUTCFullYear() === end.getUTCFullYear() &&
-    start.getUTCMonth() === end.getUTCMonth() &&
-    start.getUTCDate() === end.getUTCDate();
-  const dateStr = start.toLocaleDateString([], {
-    weekday: "short", month: "short", day: "numeric",
-    year: start.getUTCFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
-    timeZone: "UTC",
+  // Stored as real UTC; render in the studio timezone.
+  const startDay = studioDateString(start);
+  const endDay = studioDateString(end);
+  const sameDay = startDay === endDay;
+  const thisYear = new Date().getFullYear();
+  const startYear = parseInt(startDay.slice(0, 4), 10);
+  const dateStr = start.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: startYear !== thisYear ? "numeric" : undefined,
+    timeZone: STUDIO.timezone,
   });
-  const startTime = start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
-  const endTime = end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+  const startTime = start.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: STUDIO.timezone,
+  });
+  const endTime = end.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: STUDIO.timezone,
+  });
   if (sameDay) return `${dateStr} · ${startTime} – ${endTime}`;
-  const endDateStr = end.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  const endDateStr = end.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: STUDIO.timezone,
+  });
   return `${dateStr} – ${endDateStr}`;
-}
-
-function toLocalDateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 // Generate 30-min slots from 7:00 to 20:00 (26 slots)
@@ -54,7 +68,8 @@ function isSlotBlocked(
   minute: number,
   blockedTimes: BlockedTime[]
 ): BlockedTime | null {
-  const slotStart = new Date(`${slotDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`);
+  // slotDate + (hour, minute) is a studio-local wall clock → real UTC instant.
+  const slotStart = new Date(studioWallClockToUtcIso(slotDate, hour, minute));
   const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000);
 
   for (const bt of blockedTimes) {
@@ -72,7 +87,7 @@ export default function BlockedTimesPage() {
   const { toast } = useToast();
   const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(toLocalDateString(new Date()));
+  const [selectedDate, setSelectedDate] = useState(studioDateString(new Date()));
   const [togglingSlot, setTogglingSlot] = useState<string | null>(null);
 
   // Form state for manual add
@@ -80,7 +95,7 @@ export default function BlockedTimesPage() {
   const [submitting, setSubmitting] = useState(false);
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const defaultDate = toLocalDateString(tomorrow);
+  const defaultDate = studioDateString(tomorrow);
   const [startAt, setStartAt] = useState(`${defaultDate}T09:00`);
   const [endAt, setEndAt] = useState(`${defaultDate}T18:00`);
   const [reason, setReason] = useState("");
@@ -121,9 +136,9 @@ export default function BlockedTimesPage() {
         toast("Slot unblocked", "success");
       }
     } else {
-      // Create a 30-min block
-      const startIso = new Date(`${selectedDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`).toISOString();
-      const endIso = new Date(new Date(`${selectedDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`).getTime() + 30 * 60 * 1000).toISOString();
+      // Create a 30-min block in studio-local time, persisted as real UTC.
+      const startIso = studioWallClockToUtcIso(selectedDate, hour, minute);
+      const endIso = new Date(new Date(startIso).getTime() + 30 * 60 * 1000).toISOString();
 
       // Optimistic: add a temp entry
       const tempId = `temp-${Date.now()}`;
@@ -161,8 +176,8 @@ export default function BlockedTimesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          start_at: new Date(startAt).toISOString(),
-          end_at: new Date(endAt).toISOString(),
+          start_at: studioDateTimeLocalToUtcIso(startAt),
+          end_at: studioDateTimeLocalToUtcIso(endAt),
           reason: reason.trim() || undefined,
         }),
       });
@@ -195,9 +210,9 @@ export default function BlockedTimesPage() {
     }
   }
 
-  // Filter blocked times relevant to the selected date for the grid
-  const dayStart = new Date(`${selectedDate}T00:00:00`);
-  const dayEnd = new Date(`${selectedDate}T23:59:59`);
+  // Filter blocked times relevant to the selected studio-local date.
+  const dayStart = new Date(studioWallClockToUtcIso(selectedDate, 0, 0));
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
   const dayBlocks = blockedTimes.filter((bt) => {
     const s = new Date(bt.start_at);
     const e = new Date(bt.end_at);
@@ -238,9 +253,9 @@ export default function BlockedTimesPage() {
       <div className="mb-4 flex items-center gap-3">
         <button
           onClick={() => {
-            const d = new Date(selectedDate + "T12:00:00");
+            const d = new Date(selectedDate + "T12:00:00Z");
             d.setDate(d.getDate() - 1);
-            setSelectedDate(toLocalDateString(d));
+            setSelectedDate(studioDateString(d));
           }}
           className="w-11 h-11 flex items-center justify-center rounded-full border border-[#e8e2dc] hover:bg-[#f5ede8] transition-all active:scale-95"
         >
@@ -256,9 +271,9 @@ export default function BlockedTimesPage() {
         />
         <button
           onClick={() => {
-            const d = new Date(selectedDate + "T12:00:00");
+            const d = new Date(selectedDate + "T12:00:00Z");
             d.setDate(d.getDate() + 1);
-            setSelectedDate(toLocalDateString(d));
+            setSelectedDate(studioDateString(d));
           }}
           className="w-11 h-11 flex items-center justify-center rounded-full border border-[#e8e2dc] hover:bg-[#f5ede8] transition-all active:scale-95"
         >

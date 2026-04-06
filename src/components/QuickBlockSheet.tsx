@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { STUDIO } from "@/config/studio";
+import { studioWallClockToUtcIso } from "@/lib/time";
 
 interface Props {
   onBlocked?: () => void;
@@ -35,8 +36,10 @@ export default function QuickBlockSheet({ onBlocked }: Props) {
 
   async function handleSave(opts?: { force?: boolean; cancel_conflicts?: boolean }) {
     const dateStr = getDateStr();
-    const start_at = `${dateStr}T${startTime}:00Z`;
-    const end_at   = `${dateStr}T${endTime}:00Z`;
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    const start_at = studioWallClockToUtcIso(dateStr, sh ?? 0, sm ?? 0);
+    const end_at = studioWallClockToUtcIso(dateStr, eh ?? 0, em ?? 0);
 
     if (endTime <= startTime) {
       toast("End time must be after start time", "error");
@@ -180,7 +183,7 @@ export default function QuickBlockSheet({ onBlocked }: Props) {
                 <div className="space-y-1.5 mb-3">
                   {conflicts.map((c) => (
                     <p key={c.id} className="text-xs text-amber-700">
-                      {c.client_name} — {c.service_name} ({new Date(c.start_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: "UTC" })})
+                      {c.client_name} — {c.service_name} ({new Date(c.start_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: STUDIO.timezone })})
                     </p>
                   ))}
                 </div>

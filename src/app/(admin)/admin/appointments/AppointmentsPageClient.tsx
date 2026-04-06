@@ -5,6 +5,12 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AdminCalendar from "@/components/AdminCalendar";
+import { STUDIO } from "@/config/studio";
+import {
+  studioWallClockToUtcIso,
+  formatStudioDateTimeLocal,
+  studioDateTimeLocalToUtcIso,
+} from "@/lib/time";
 
 interface ServiceInfo {
   id: string;
@@ -56,7 +62,11 @@ function totalPriceCents(appt: AppointmentRow): number {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: STUDIO.timezone,
+  });
 }
 
 function formatDuration(min: number): string {
@@ -73,8 +83,8 @@ function centsToDisplay(cents: number): string {
 function groupByDate(appointments: AppointmentRow[]): Record<string, AppointmentRow[]> {
   const groups: Record<string, AppointmentRow[]> = {};
   for (const appt of appointments) {
-    const key = new Date(appt.start_at).toLocaleDateString([], {
-      weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
+    const key = new Date(appt.start_at).toLocaleDateString("en-US", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: STUDIO.timezone,
     });
     if (!groups[key]) groups[key] = [];
     groups[key]!.push(appt);
@@ -257,8 +267,8 @@ export default function AppointmentsPageClient({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          start_at: editAppt.start_at.endsWith("Z") ? editAppt.start_at : `${editAppt.start_at}:00Z`,
-          end_at: editAppt.end_at.endsWith("Z") ? editAppt.end_at : `${editAppt.end_at}:00Z`,
+          start_at: studioDateTimeLocalToUtcIso(editAppt.start_at),
+          end_at: studioDateTimeLocalToUtcIso(editAppt.end_at),
           service_id: editAppt.service_id || undefined,
           client_notes: editAppt.client_notes,
         }),
@@ -294,16 +304,11 @@ export default function AppointmentsPageClient({
 
   function openEdit(appt: AppointmentRow) {
     const svc = getAllServices(appt)[0];
-    // Convert fake-UTC ISO to datetime-local format (use UTC methods since times are stored as fake-UTC)
-    const toLocalDT = (iso: string) => {
-      const d = new Date(iso);
-      const pad = (n: number) => String(n).padStart(2, "0");
-      return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-    };
+    // Render the stored UTC instant as a studio-local datetime-local value.
     setEditAppt({
       id: appt.id,
-      start_at: toLocalDT(appt.start_at),
-      end_at: toLocalDT(appt.end_at),
+      start_at: formatStudioDateTimeLocal(appt.start_at),
+      end_at: formatStudioDateTimeLocal(appt.end_at),
       service_id: svc?.id ?? "",
       client_notes: appt.client_notes ?? "",
     });
@@ -822,7 +827,7 @@ function CreateAppointmentModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const isPast = new Date(`${date}T${time}`) < new Date();
+  const isPast = new Date(studioDateTimeLocalToUtcIso(`${date}T${time}`)) < new Date();
 
   // Search clients
   useEffect(() => {
@@ -897,12 +902,14 @@ function CreateAppointmentModal({
   const totalPrice = selectedServices.reduce((sum, s) => sum + s.price_cents, 0);
 
   function computeEndIso(): string {
-    // Build end time by adding duration to start, keeping fake-UTC convention
+    // Add the service duration to the studio-local start time, then convert
+    // the resulting wall clock to a real UTC instant.
     const [h, m] = time.split(":").map(Number);
-    const totalMin = (h ?? 0) * 60 + (m ?? 0) + (totalDur || 60);
-    const eh = String(Math.floor(totalMin / 60) % 24).padStart(2, "0");
-    const em = String(totalMin % 60).padStart(2, "0");
-    return `${date}T${eh}:${em}:00Z`;
+    const startMin = (h ?? 0) * 60 + (m ?? 0);
+    const endMin = startMin + (totalDur || 60);
+    const eh = Math.floor(endMin / 60) % 24;
+    const em = endMin % 60;
+    return studioWallClockToUtcIso(date, eh, em);
   }
 
   async function handleSubmit() {
@@ -910,7 +917,7 @@ function CreateAppointmentModal({
     setSaving(true);
     setError("");
 
-    const startIso = `${date}T${time}:00Z`;
+    const startIso = studioDateTimeLocalToUtcIso(`${date}T${time}`);
     const endIso = computeEndIso();
 
     // Only send real service IDs (not custom ones)

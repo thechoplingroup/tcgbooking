@@ -1,11 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { STUDIO } from "@/config/studio";
+import {
+  studioDateString,
+  studioDayStartUtcIso,
+  studioDayEndUtcIso,
+} from "@/lib/time";
 
-function getTomorrow(): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10); // "YYYY-MM-DD"
+function getStudioTomorrow(): string {
+  // Studio-local "tomorrow" as YYYY-MM-DD.
+  const now = new Date();
+  const todayStr = studioDateString(now);
+  const [y, m, d] = todayStr.split("-").map(Number);
+  const next = new Date(Date.UTC(y!, m! - 1, d! + 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
 }
 
 function formatDateTime(iso: string): string {
@@ -61,10 +69,11 @@ export async function GET(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const tomorrow = getTomorrow();
+  const tomorrow = getStudioTomorrow();
   const errors: string[] = [];
 
-  // Query confirmed appointments for tomorrow
+  // Query confirmed appointments whose start_at falls on the studio-local
+  // "tomorrow" window (midnight → next midnight, expressed as real UTC).
   const { data: appointments, error: queryError } = await supabase
     .from("appointments")
     .select(`
@@ -73,8 +82,8 @@ export async function GET(request: Request) {
       client:profiles!client_id(full_name)
     `)
     .eq("status", "confirmed")
-    .gte("start_at", `${tomorrow}T00:00:00`)
-    .lt("start_at", `${tomorrow}T23:59:59`);
+    .gte("start_at", studioDayStartUtcIso(tomorrow))
+    .lt("start_at", studioDayEndUtcIso(tomorrow));
 
   if (queryError) {
     return NextResponse.json(

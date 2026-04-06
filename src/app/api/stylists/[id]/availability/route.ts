@@ -6,6 +6,12 @@ import {
   filterAvailableSlots,
   formatSlot,
 } from "@/lib/availability";
+import {
+  studioDayStartUtcIso,
+  studioDayEndUtcIso,
+  studioMinutesFromMidnight,
+  studioDateString,
+} from "@/lib/time";
 
 export async function GET(
   request: Request,
@@ -65,10 +71,11 @@ export async function GET(
     duration = service.duration_minutes as number;
   }
 
-  // Day of week: 0 = Sunday
+  // Day of week (studio-local): 0 = Sunday
   const dateParts = dateStr.split("-").map(Number);
-  const dateObj = new Date(Date.UTC(dateParts[0]!, dateParts[1]! - 1, dateParts[2]!));
-  const dayOfWeek = dateObj.getUTCDay();
+  const dayOfWeek = new Date(
+    Date.UTC(dateParts[0]!, dateParts[1]! - 1, dateParts[2]!),
+  ).getUTCDay();
 
   // ── 1. Default operational hours for the day ──────────────────────────────
   const { data: defaultHours } = await supabase
@@ -131,48 +138,55 @@ export async function GET(
     return NextResponse.json({ slots: [] });
   }
 
-  // Fetch existing appointments for this day
-  const dayStart = `${dateStr}T00:00:00+00:00`;
-  const dayEnd = `${dateStr}T23:59:59+00:00`;
+  // Fetch existing appointments for this day — window is studio-local midnight
+  // expressed as real UTC ISO instants.
+  const dayStart = studioDayStartUtcIso(dateStr);
+  const dayEnd = studioDayEndUtcIso(dateStr);
 
   const { data: appointments } = await supabase
     .from("appointments")
     .select("start_at, end_at")
     .eq("stylist_id", params.id)
     .in("status", ["pending", "confirmed"])
-    .lte("start_at", dayEnd)
-    .gte("end_at", dayStart);
+    .lt("start_at", dayEnd)
+    .gt("end_at", dayStart);
 
   // Fetch blocked_times overlapping this day
   const { data: blocked } = await supabase
     .from("blocked_times")
     .select("start_at, end_at")
     .eq("stylist_id", params.id)
-    .lte("start_at", dayEnd)
-    .gte("end_at", dayStart);
+    .lt("start_at", dayEnd)
+    .gt("end_at", dayStart);
 
-  // Convert appointments and blocked times to minute-offsets from midnight UTC
-  function toMinutesFromMidnight(isoStr: string): number {
-    const d = new Date(isoStr);
-    return d.getUTCHours() * 60 + d.getUTCMinutes();
+  // Convert busy ranges to minute-offsets from studio-local midnight.
+  // Ranges that straddle midnight are clamped to [0, 1440].
+  function toStudioMinutes(isoStr: string, anchorDayStartIso: string): number {
+    const t = new Date(isoStr).getTime();
+    const dayStartMs = new Date(anchorDayStartIso).getTime();
+    const raw = Math.round((t - dayStartMs) / 60000);
+    // Fall back to studio clock conversion if the value isn't within today.
+    if (raw < 0) return 0;
+    if (raw > 1440) return 1440;
+    return raw;
   }
 
   const busyRanges = [
     ...(appointments ?? []).map((a) => ({
-      start: toMinutesFromMidnight(a.start_at as string),
-      end: toMinutesFromMidnight(a.end_at as string),
+      start: toStudioMinutes(a.start_at as string, dayStart),
+      end: toStudioMinutes(a.end_at as string, dayStart),
     })),
     ...(blocked ?? []).map((b) => ({
-      start: toMinutesFromMidnight(b.start_at as string),
-      end: toMinutesFromMidnight(b.end_at as string),
+      start: toStudioMinutes(b.start_at as string, dayStart),
+      end: toStudioMinutes(b.end_at as string, dayStart),
     })),
   ];
 
-  // Also skip slots in the past (if today)
+  // Also skip slots in the past (if today in studio-local calendar).
   const now = new Date();
-  const todayUTC = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
-  const isToday = dateStr === todayUTC;
-  const nowMinutes = isToday ? now.getUTCHours() * 60 + now.getUTCMinutes() : -1;
+  const studioToday = studioDateString(now);
+  const isToday = dateStr === studioToday;
+  const nowMinutes = isToday ? studioMinutesFromMidnight(now) : -1;
 
   const available = filterAvailableSlots(candidates, busyRanges, isToday, nowMinutes);
 
